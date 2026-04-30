@@ -1,0 +1,194 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import axios from 'axios'
+import {
+  coerceConfidence,
+  coerceCount,
+  collectAiResponseRoots,
+  extractConfidenceFromAiResponse,
+  extractCountFromAiResponse,
+  verifyMangrovePlantVideo,
+} from './aiMangroveVerificationService'
+
+test('coerceCount floors non-negative ints', () => {
+  assert.equal(coerceCount(3.9), 3)
+  assert.equal(coerceCount(-1), 0)
+  assert.equal(coerceCount('42'), 42)
+  assert.equal(coerceCount('nope'), undefined)
+})
+
+test('coerceConfidence maps 0-1 and 0-100', () => {
+  assert.equal(coerceConfidence(0.8), 0.8)
+  assert.equal(coerceConfidence(95), 0.95)
+  assert.equal(coerceConfidence(101), undefined)
+})
+
+test('collectAiResponseRoots flattens outputs array', () => {
+  const raw = { outputs: [{ mangrove_count: 1 }, { x: 2 }] }
+  const roots = collectAiResponseRoots(raw)
+  assert.equal(roots.length, 3)
+  assert.equal((roots[1] as { mangrove_count: number }).mangrove_count, 1)
+})
+
+test('collectAiResponseRoots includes object outputs', () => {
+  const raw = { outputs: { mangrove_count: 7 } }
+  const roots = collectAiResponseRoots(raw)
+  assert.ok(roots.some(r => extractCountFromAiResponse(r) === 7))
+})
+
+test('extractCountFromAiResponse finds mangrove_count on root', () => {
+  assert.equal(extractCountFromAiResponse({ mangrove_count: 12 }), 12)
+})
+
+test('extractCountFromAiResponse finds count inside outputs[0]', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      outputs: [{ mangrove_count: 4 }],
+    }),
+    4,
+  )
+})
+
+test('extractConfidenceFromAiResponse reads nested outputs', () => {
+  assert.equal(
+    extractConfidenceFromAiResponse({
+      outputs: [{ confidence: 0.91 }],
+    }),
+    0.91,
+  )
+})
+
+test('verifyMangrovePlantVideo roboflow_workflow skips ffmpeg when workflowImageUrl is set', async t => {
+  const keys = [
+    'AI_PROVIDER',
+    'ROBOFLOW_API_KEY',
+    'ROBOFLOW_WORKFLOW_URL',
+    'ROBOFLOW_WORKSPACE_NAME',
+    'ROBOFLOW_WORKSPACE',
+    'ROBOFLOW_WORKFLOW_ID',
+    'ROBOFLOW_WORKFLOW_SPEC_PATH',
+    'AI_ROBOFLOW_SEND_VIDEOMETA',
+    'AI_ROBOFLOW_SEND_CONFIDENCE',
+    'AI_ROBOFLOW_MINIMAL_REQUEST',
+  ] as const
+  const restore = keys.map(k => {
+    const v = process.env[k]
+    return () => {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+
+  t.after(() => restore.forEach(fn => fn()))
+
+  process.env.AI_PROVIDER = 'roboflow_workflow'
+  process.env.ROBOFLOW_API_KEY = 'test-key'
+  process.env.ROBOFLOW_WORKFLOW_URL =
+    'https://serverless.roboflow.com/ws/workflows/wf-test'
+  delete process.env.ROBOFLOW_WORKSPACE_NAME
+  delete process.env.ROBOFLOW_WORKSPACE
+  delete process.env.ROBOFLOW_WORKFLOW_ID
+  delete process.env.ROBOFLOW_WORKFLOW_SPEC_PATH
+  process.env.AI_ROBOFLOW_SEND_VIDEOMETA = 'false'
+  process.env.AI_ROBOFLOW_SEND_CONFIDENCE = 'false'
+
+  type PostFn = typeof axios.post
+  const originalPost = axios.post
+  axios.post = (async (url: string, payload: unknown) => {
+    assert.match(url, /serverless\.roboflow\.com/)
+    assert.equal((payload as { api_key?: string }).api_key, 'test-key')
+    const inputs = (payload as { inputs: Record<string, unknown> }).inputs
+    assert.equal((inputs.image as { type: string }).type, 'url')
+    assert.equal(
+      (inputs.image as { value: string }).value,
+      'https://cdn.example/img.jpg',
+    )
+    assert.equal('confidence' in inputs, false)
+    assert.equal('videometa' in inputs, false)
+    return {
+      status: 200,
+      data: { outputs: [{ mangrove_count: 5 }] },
+    }
+  }) as PostFn
+
+  try {
+    const result = await verifyMangrovePlantVideo({
+      videoBuffer: Buffer.alloc(0),
+      filename: 'plant.mp4',
+      contentType: 'video/mp4',
+      workflowImageUrl: 'https://cdn.example/img.jpg',
+      ctx: {
+        submissionId: 'sub-1',
+        userWalletAddress: '0xabc',
+        latitude: 1,
+        longitude: 2,
+        declaredTreesPlanted: 5,
+      },
+    })
+
+    assert.equal(result.skipped && result.ok, false)
+    assert.equal(result.ok, true)
+    if (result.ok) {
+      assert.equal(result.countedMangroves, 5)
+    }
+  } finally {
+    axios.post = originalPost
+  }
+})
+
+test('verifyMangrovePlantVideo ultralytics posts multipart when configured', async t => {
+  const keys = [
+    'AI_PROVIDER',
+    'AI_API_BEARER_TOKEN',
+    'AI_API_PREDICT_URL',
+    'AI_API_VERIFY_PATH',
+    'AI_PREDICT_CONF',
+    'AI_PREDICT_IOU',
+    'AI_PREDICT_IMGSZ',
+  ] as const
+  const restore = keys.map(k => {
+    const v = process.env[k]
+    return () => {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+  t.after(() => restore.forEach(fn => fn()))
+
+  process.env.AI_PROVIDER = 'ultralytics'
+  process.env.AI_API_BEARER_TOKEN = 'bearer-ul'
+  process.env.AI_API_PREDICT_URL = 'https://predict.example/run'
+  delete process.env.AI_API_VERIFY_PATH
+  process.env.AI_PREDICT_CONF = '0.25'
+
+  type PostFn = typeof axios.post
+  const originalPost = axios.post
+  axios.post = (async (_url: string, form: unknown) => {
+    assert.ok(form && typeof form === 'object')
+    assert.equal(_url, 'https://predict.example/run')
+    assert.ok(
+      typeof (form as { getHeaders?: () => unknown }).getHeaders === 'function',
+    )
+    return { status: 200, data: { count: 3 } }
+  }) as PostFn
+
+  try {
+    const buf = Buffer.from('fake-mp4')
+    const result = await verifyMangrovePlantVideo({
+      videoBuffer: buf,
+      filename: 'plant.mp4',
+      contentType: 'video/mp4',
+      ctx: {
+        submissionId: 'sub-2',
+        userWalletAddress: '0xdef',
+        latitude: 0,
+        longitude: 0,
+        declaredTreesPlanted: 3,
+      },
+    })
+    assert.equal(result.ok, true)
+    if (result.ok) assert.equal(result.countedMangroves, 3)
+  } finally {
+    axios.post = originalPost
+  }
+})

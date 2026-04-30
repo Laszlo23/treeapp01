@@ -1,0 +1,7 @@
+# Root — subprojects keep their own .gitignore rules; this covers shared cruft at repo root.
+
+.DS_Store
+*.log
+.env
+!.env.example
+.idea/

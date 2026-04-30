@@ -1,0 +1,428 @@
+import 'dotenv/config'
+
+/** Average Gregorian year in seconds (365.25 days). */
+const AVG_YEAR_SEC = 365.25 * 86400
+/** Default claim spacing: 6 calendar months (~½ average Gregorian year). */
+const DEFAULT_MGRO_CLAIM_INTERVAL = Math.round((AVG_YEAR_SEC / 12) * 6)
+/** Default number of vesting checkpoints/tranches over the schedule. */
+const DEFAULT_MGRO_CLAIM_COUNT = 6
+const DEFAULT_MGRO_BURN_START_BLOCK = 38440170
+
+class EnvironmentConfig {
+  constructor() {
+    this.validateRequired()
+  }
+
+  get PORT() {
+    return process.env.PORT || 5000
+  }
+
+  get NODE_ENV() {
+    return process.env.NODE_ENV || 'development'
+  }
+
+  get MONGODB_URI() {
+    return process.env.MONGODB_URI
+  }
+
+  get PINATA_JWT() {
+    return process.env.PINATA_JWT || ''
+  }
+
+  get PINATA_GATEWAY_BASE_URL() {
+    return process.env.PINATA_GATEWAY_BASE_URL || ''
+  }
+
+  get isDevelopment() {
+    return this.NODE_ENV === 'development'
+  }
+
+  get isProduction() {
+    return this.NODE_ENV === 'production'
+  }
+
+  // Optional chain config for verifier feature
+  get BASE_SEPOLIA_RPC_URL() {
+    return process.env.BASE_SEPOLIA_RPC_URL || process.env.RPC_URL
+  }
+
+  get TGN_VAULT_ADDRESS() {
+    return (
+      process.env.TGN_VAULT_ADDRESS ||
+      '0x66e003F3318F13b122477E2561c1cf5C5181bc97'
+    )
+  }
+
+  get TGN_TOKEN_ADDRESS() {
+    return (
+      process.env.TGN_TOKEN_ADDRESS ||
+      '0xA10336e3e0ee9CC81397db91aC585BA32460Cdcf'
+    )
+  }
+
+  get DAO_CONTRACT_ADDRESS() {
+    return (
+      process.env.DAO_CONTRACT_ADDRESS ||
+      '0xe0Eb9FCfccEaA66edE66F5B94bfAdC1c90CeDc4D'
+    )
+  }
+
+  get MGRO_TOKEN_ADDRESS() {
+    return (
+      process.env.MGRO_TOKEN_ADDRESS ||
+      '0xE2507198a1C2cC0Fc6559159e2D86604a25bBE79'
+    )
+  }
+
+  /** Private key for wallet that mints MGRO rewards (must have minter role on contract). */
+  get MGRO_MINTER_PRIVATE_KEY() {
+    return process.env.MGRO_MINTER_PRIVATE_KEY || ''
+  }
+
+  /** Private key for wallet allowed to call TGNVault.slash. */
+  get TGN_VAULT_SLASHER_PRIVATE_KEY() {
+    return process.env.TGN_VAULT_SLASHER_PRIVATE_KEY || ''
+  }
+
+  get MGRO_DECIMALS() {
+    const d = parseInt(process.env.MGRO_DECIMALS || '18', 10)
+    return Number.isNaN(d) ? 18 : d
+  }
+
+  /**
+   * Seconds between planter reward tranche unlock times.
+   * Default: 6 calendar months.
+   */
+  get MGRO_CLAIM_INTERVAL() {
+    const raw = process.env.MGRO_CLAIM_INTERVAL
+    const n =
+      raw !== undefined && raw !== ''
+        ? parseInt(raw, 10)
+        : DEFAULT_MGRO_CLAIM_INTERVAL
+    return Number.isNaN(n) || n <= 0 ? DEFAULT_MGRO_CLAIM_INTERVAL : n
+  }
+
+  /**
+   * Number of reward tranches/checkpoints in the schedule.
+   * Total schedule duration is derived as intervalSeconds * claimCount.
+   */
+  get MGRO_CLAIM_COUNT() {
+    const raw = process.env.MGRO_CLAIM_COUNT
+    const n =
+      raw !== undefined && raw !== ''
+        ? parseInt(raw, 10)
+        : DEFAULT_MGRO_CLAIM_COUNT
+    return Number.isNaN(n) || n <= 0 ? DEFAULT_MGRO_CLAIM_COUNT : n
+  }
+
+  get TGN_DECIMALS() {
+    const d = parseInt(process.env.TGN_DECIMALS || '18')
+    return Number.isNaN(d) ? 18 : d
+  }
+
+  get VALIDATORS_MINIMUM_TGN_TOKENS() {
+    return process.env.VALIDATORS_MINIMUM_TGN_TOKENS || 2000n
+  }
+
+  get MINIMUM_ACTIVE_VERIFIERS() {
+    const raw = process.env.MINIMUM_ACTIVE_VERIFIERS
+    const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 5
+    return Number.isNaN(n) ? 5 : Math.max(1, n)
+  }
+
+  get TGN_STAKE_VERIFIER_CRON_TIME() {
+    return process.env.TGN_STAKE_VERIFIER_CRON_TIME || '13 2 * * *'
+  }
+
+  get ENABLE_CRONJOBS() {
+    return process.env.ENABLE_CRONJOBS || 'false'
+  }
+
+  get ENABLE_REWARD_CLAIM_WORKER() {
+    return process.env.ENABLE_REWARD_CLAIM_WORKER || 'false'
+  }
+
+  get ENABLE_SLASH_WORKER() {
+    return process.env.ENABLE_SLASH_WORKER || 'false'
+  }
+
+  get ENABLE_BURN_INDEXER() {
+    return process.env.ENABLE_BURN_INDEXER || 'false'
+  }
+
+  get BURN_INDEXER_POLL_MS() {
+    const raw = process.env.BURN_INDEXER_POLL_MS
+    const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 30000
+    return Number.isNaN(n) || n < 1000 ? 30000 : n
+  }
+
+  get BURN_INDEXER_CONFIRMATIONS() {
+    const raw = process.env.BURN_INDEXER_CONFIRMATIONS
+    const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 12
+    return Number.isNaN(n) || n < 0 ? 12 : n
+  }
+
+  get BURN_INDEXER_CHUNK_SIZE() {
+    const raw = process.env.BURN_INDEXER_CHUNK_SIZE
+    const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 2000
+    return Number.isNaN(n) || n <= 0 ? 2000 : n
+  }
+
+  get MGRO_BURN_START_BLOCK() {
+    const raw = process.env.MGRO_BURN_START_BLOCK
+    const n =
+      raw !== undefined && raw !== ''
+        ? parseInt(raw, 10)
+        : DEFAULT_MGRO_BURN_START_BLOCK
+    return Number.isNaN(n) || n < 0 ? DEFAULT_MGRO_BURN_START_BLOCK : n
+  }
+
+  get REDIS_URL() {
+    return process.env.REDIS_URL || ''
+  }
+
+  get REDIS_HOST() {
+    return process.env.REDIS_HOST || '127.0.0.1'
+  }
+
+  get REDIS_PORT() {
+    const v = parseInt(process.env.REDIS_PORT || '6379', 10)
+    return Number.isNaN(v) ? 6379 : v
+  }
+
+  get REDIS_PASSWORD() {
+    return process.env.REDIS_PASSWORD || ''
+  }
+
+  get REDIS_DB() {
+    const v = parseInt(process.env.REDIS_DB || '0', 10)
+    return Number.isNaN(v) ? 0 : v
+  }
+
+  get REDIS_TLS() {
+    return process.env.REDIS_TLS === 'true'
+  }
+
+  /** Max distance (m) between health-check GPS and submission plant GPS for eligibility. */
+  get HEALTH_CHECK_MAX_DISTANCE_METERS() {
+    const raw = process.env.HEALTH_CHECK_MAX_DISTANCE_METERS
+    const n = raw !== undefined && raw !== '' ? parseFloat(raw) : 5
+    return Number.isNaN(n) || n <= 0 ? 5 : n
+  }
+
+  /**
+   * `ultralytics` — multipart Bearer call to `AI_API_BASE_URL` + `AI_API_VERIFY_PATH` (default).
+   * `roboflow_workflow` — JSON workflow call to Roboflow Serverless (`ROBOFLOW_*` settings).
+   */
+  get AI_PROVIDER() {
+    const v = (process.env.AI_PROVIDER || 'ultralytics').trim().toLowerCase()
+    if (v === 'roboflow_workflow' || v === 'roboflow')
+      return 'roboflow_workflow'
+    return 'ultralytics'
+  }
+
+  /** Mangrove AI verification API (Building Culture). All optional — if unset, plant uploads skip AI. */
+  get AI_API_BASE_URL() {
+    const raw =
+      process.env.AI_API_BASE_URL || 'https://app.buildingculture.capital'
+    return String(raw).replace(/\/+$/, '')
+  }
+
+  get AI_API_BEARER_TOKEN() {
+    return process.env.AI_API_BEARER_TOKEN || ''
+  }
+
+  /** Path appended to AI_API_BASE_URL, e.g. `/mangrove/verify` (must include leading `/`). */
+  get AI_API_VERIFY_PATH() {
+    return (process.env.AI_API_VERIFY_PATH || '').trim()
+  }
+
+  /**
+   * Full POST URL for Ultralytics-style `/predict` (e.g. Cloud Run). When set, overrides
+   * `AI_API_BASE_URL` + `AI_API_VERIFY_PATH` (no path join).
+   */
+  get AI_API_PREDICT_URL() {
+    return (process.env.AI_API_PREDICT_URL || '').trim()
+  }
+
+  /** Multipart field name for the video file sent to the AI API. */
+  get AI_VIDEO_FORM_FIELD_NAME() {
+    const v = (process.env.AI_VIDEO_FORM_FIELD_NAME || 'video').trim()
+    return v || 'video'
+  }
+
+  /**
+   * When true (default), appends submissionId, wallet, GPS, declared count to multipart.
+   * Set false for minimal `/predict` endpoints that only accept `file` + inference params.
+   */
+  get AI_API_SEND_SUBMISSION_METADATA() {
+    return process.env.AI_API_SEND_SUBMISSION_METADATA !== 'false'
+  }
+
+  /** Optional multipart fields for Ultralytics-style predict (omit when unset). */
+  get AI_PREDICT_CONF() {
+    return (process.env.AI_PREDICT_CONF || '').trim()
+  }
+
+  get AI_PREDICT_IOU() {
+    return (process.env.AI_PREDICT_IOU || '').trim()
+  }
+
+  get AI_PREDICT_IMGSZ() {
+    return (process.env.AI_PREDICT_IMGSZ || '').trim()
+  }
+
+  get AI_REQUEST_TIMEOUT_MS() {
+    const raw = process.env.AI_REQUEST_TIMEOUT_MS
+    const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 120_000
+    return Number.isNaN(n) || n < 5000 ? 120_000 : Math.min(n, 600_000)
+  }
+
+  get AI_AUTO_APPROVE_MIN_CONFIDENCE() {
+    const raw = process.env.AI_AUTO_APPROVE_MIN_CONFIDENCE
+    const n = raw !== undefined && raw !== '' ? parseFloat(raw) : 0.9
+    return Number.isNaN(n) || n < 0 || n > 1 ? 0.9 : n
+  }
+
+  get AI_MAX_COUNT_DELTA() {
+    const raw = process.env.AI_MAX_COUNT_DELTA
+    const n = raw !== undefined && raw !== '' ? parseInt(String(raw), 10) : 1
+    return Number.isNaN(n) || n < 0 ? 1 : n
+  }
+
+  /** Comma-separated paths to try for integer count (e.g. `count,data.count`). */
+  get AI_RESPONSE_COUNT_PATHS() {
+    const def =
+      'mangrove_count,count,outputs.mangrove_count,outputs.0.mangrove_count,data.count,data.mangrove_count,result.mangrove_count,data.detected,data.detected_count,result.count,treesCount,mangroveCount,mangrovesCounted,detected,totalDetections'
+    return (process.env.AI_RESPONSE_COUNT_PATHS || def)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+  }
+
+  /** Comma-separated paths to try for confidence in 0–1 or 0–100. */
+  get AI_RESPONSE_CONFIDENCE_PATHS() {
+    const def =
+      'confidence,data.confidence,score,data.score,data.confidence_score,overallConfidence'
+    return (process.env.AI_RESPONSE_CONFIDENCE_PATHS || def)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+  }
+
+  /** Cap stored JSON string size for auditing (characters). */
+  get AI_RAW_RESPONSE_MAX_CHARS() {
+    const raw = process.env.AI_RAW_RESPONSE_MAX_CHARS
+    const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 16_384
+    return Number.isNaN(n) || n < 1024 ? 16_384 : Math.min(n, 256_000)
+  }
+
+  // --- Roboflow Serverless workflows (when AI_PROVIDER=roboflow_workflow) ---
+
+  /** Base URL for Serverless workflows (matches inference-sdk InferenceHTTPClient). */
+  get ROBOFLOW_API_URL() {
+    const raw =
+      process.env.ROBOFLOW_API_URL ||
+      process.env.ROBOFLOW_SERVERLESS_URL ||
+      'https://serverless.roboflow.com'
+    return String(raw).replace(/\/+$/, '')
+  }
+
+  /**
+   * Prefer `ROBOFLOW_API_KEY`.
+   * If unset, `AI_API_BEARER_TOKEN` is used so a single secret can supply both providers (optional).
+   */
+  get ROBOFLOW_API_KEY() {
+    const k =
+      process.env.ROBOFLOW_API_KEY ||
+      process.env.ROBOFLOW_PRIVATE_API_KEY ||
+      process.env.AI_API_BEARER_TOKEN ||
+      ''
+    return String(k).trim()
+  }
+
+  /** Deployed workspace name (named workflow URL segment). */
+  get ROBOFLOW_WORKSPACE_NAME() {
+    return (
+      process.env.ROBOFLOW_WORKSPACE_NAME ||
+      process.env.ROBOFLOW_WORKSPACE ||
+      ''
+    ).trim()
+  }
+
+  get ROBOFLOW_WORKFLOW_ID() {
+    return (process.env.ROBOFLOW_WORKFLOW_ID || '').trim()
+  }
+
+  /**
+   * Optional full POST URL override (snippet from Roboflow UI).
+   * If unset, workspace + workflow id or spec file derives the URL.
+   */
+  get ROBOFLOW_WORKFLOW_URL() {
+    return (process.env.ROBOFLOW_WORKFLOW_URL || '').trim()
+  }
+
+  /**
+   * Path to JSON workflow specification file (mutually exclusive with named workflow).
+   * When set, requests go to `{ROBOFLOW_API_URL}/workflows/run` with `specification` in the body.
+   */
+  get ROBOFLOW_WORKFLOW_SPEC_PATH() {
+    return (process.env.ROBOFLOW_WORKFLOW_SPEC_PATH || '').trim()
+  }
+
+  /** Workflow parameter `confidence` (0–1). */
+  get AI_ROBOFLOW_CONFIDENCE() {
+    const raw = process.env.AI_ROBOFLOW_CONFIDENCE
+    const n = raw !== undefined && raw !== '' ? parseFloat(raw) : 0.96
+    return Number.isNaN(n) || n < 0 || n > 1 ? 0.96 : n
+  }
+
+  /** Workflow `InferenceImage` input name from your deployed graph (default matches plan). */
+  get AI_ROBOFLOW_IMAGE_FIELD() {
+    const v = (process.env.AI_ROBOFLOW_IMAGE_FIELD || 'image').trim()
+    return v || 'image'
+  }
+
+  /**
+   * Optional JSON object merged into workflow `inputs` as `videometa` (e.g. fps / duration hints).
+   * Example: {"fps":30}
+   */
+  get AI_ROBOFLOW_VIDEOMETA_JSON(): string {
+    return (process.env.AI_ROBOFLOW_VIDEOMETA_JSON || '').trim()
+  }
+
+  /**
+   * When true (default), sends a minimal `videometa` derived from ffprobe (+ optional JSON overlay).
+   * Set `false` if your deployed workflow omits WorkflowVideoMetadata.
+   */
+  get AI_ROBOFLOW_SEND_VIDEOMETA() {
+    return process.env.AI_ROBOFLOW_SEND_VIDEOMETA !== 'false'
+  }
+
+  /**
+   * When false, omits `confidence` from workflow `inputs` (matches minimal browser snippets).
+   */
+  get AI_ROBOFLOW_SEND_CONFIDENCE() {
+    return process.env.AI_ROBOFLOW_SEND_CONFIDENCE !== 'false'
+  }
+
+  /**
+   * When true, JSON body is only `{ api_key, inputs }` (no use_cache / enable_profiling).
+   */
+  get AI_ROBOFLOW_MINIMAL_REQUEST() {
+    return process.env.AI_ROBOFLOW_MINIMAL_REQUEST === 'true'
+  }
+
+  validateRequired() {
+    const required = ['MONGODB_URI', 'PINATA_JWT']
+    const missing = required.filter(key => !process.env[key])
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missing.join(', ')}`,
+      )
+    }
+  }
+}
+
+export default new EnvironmentConfig()
