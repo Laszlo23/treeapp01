@@ -1,10 +1,9 @@
 import axios from 'axios'
+import { apiBaseUrl } from '@/config/apiBaseUrl'
 import { getJwtToken } from './jwtTokenStore'
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'
-
 export const axiosInstance = axios.create({
-  baseURL: apiUrl,
+  baseURL: apiBaseUrl,
   headers: {
     'Content-type': 'application/json',
   },
@@ -17,7 +16,10 @@ axiosInstance.interceptors.request.use(
     if (typeof window !== 'undefined') {
       const requestUrl = config.baseURL || config.url || ''
       // Only add token if the request is going to our API
-      if (requestUrl.includes(apiUrl) || config.baseURL === apiUrl) {
+      if (
+        requestUrl.includes(apiBaseUrl) ||
+        config.baseURL === apiBaseUrl
+      ) {
         const token = getJwtToken()
         if (token) {
           if (!config.headers) {

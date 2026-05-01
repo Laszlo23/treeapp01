@@ -1,8 +1,7 @@
 import { VideoType } from '@/services/videoService'
 import { ISubmissionGroup, IUserProfile, IVideo, VideoStatus } from '@/types'
 
-const baseURL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://treegens.app'
+import { apiBaseUrl as baseURL } from '@/config/apiBaseUrl'
 const VIDEOS_CACHE_KEY = 'treegens_videos'
 const USER_CACHE_KEY = 'treegens_cached_user'
 

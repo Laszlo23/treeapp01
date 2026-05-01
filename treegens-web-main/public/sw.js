@@ -3,7 +3,7 @@
  * Handles offline video upload queue and background sync
  */
 
-const SW_VERSION = 'v1.267'
+const SW_VERSION = 'v1.268'
 const STATIC_CACHE = `treegens-static-${SW_VERSION}` // bump to refresh HTML/images
 const RUNTIME_CACHE = `treegens-runtime-${SW_VERSION}` // keep stable for Next build assets
 const FF_CACHE = 'treegens-ffmpeg-core' // dedicated, never-versioned cache for ffmpeg core
@@ -64,7 +64,8 @@ console.info = (...args) => {
 let CURRENT_AUTH_TOKEN = null
 
 // Service workers can't access process.env, so use hardcoded URL or receive from main thread
-let BASE_URL = 'https://treegens-be.generalmagic.io' // Default fallback
+// Must match production API host (nginx proxies /api on treegens.app). Main thread sends SET_BASE_URL from apiBaseUrl.
+let BASE_URL = 'https://treegens.app'
 
 // Files to cache for offline functionality
 const STATIC_ASSETS = [

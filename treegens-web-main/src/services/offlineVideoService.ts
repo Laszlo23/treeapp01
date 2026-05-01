@@ -3,6 +3,7 @@
  * Handles queuing videos for background sync when offline
  */
 
+import { apiBaseUrl } from '@/config/apiBaseUrl'
 import { AuthService } from './authService'
 import {
   CompressionProgress,
@@ -540,9 +541,9 @@ export class OfflineVideoService {
    */
   private async sendBaseURLToServiceWorker(): Promise<void> {
     try {
-      const baseURL =
-        process.env.NEXT_PUBLIC_API_URL || 'https://treegens.app'
-      await this.sendMessageToServiceWorker('SET_BASE_URL', { baseURL })
+      await this.sendMessageToServiceWorker('SET_BASE_URL', {
+        baseURL: apiBaseUrl,
+      })
     } catch (error) {
       console.log(
         '[OfflineVideoService] Failed to send base URL to service worker:',

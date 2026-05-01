@@ -21,6 +21,7 @@ import {
   useActiveWallet,
   useDisconnect,
   useIsAutoConnecting,
+  useSwitchActiveWalletChain,
 } from 'thirdweb/react'
 import { defaultChain } from '@/config/thirdwebChain'
 import { AuthService } from '../services/authService'
@@ -70,6 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { disconnect } = useDisconnect()
   const account = useActiveAccount()
   const activeWallet = useActiveWallet()
+  const switchChain = useSwitchActiveWalletChain()
   const isAutoConnecting = useIsAutoConnecting()
   const { isUserOnline } = useConnectivity()
 
@@ -92,10 +94,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     lastAuthAttemptAtRef.current = Date.now()
     setIsLoading(true)
     try {
-      const chainId = activeWallet?.getChain()?.id ?? defaultChain.id
+      const onChain = activeWallet?.getChain()?.id
+      if (onChain !== defaultChain.id) {
+        try {
+          await switchChain(defaultChain)
+        } catch (switchErr) {
+          console.warn('[auth] switch to Base mainnet:', switchErr)
+          toast.error(
+            'Switch to Base mainnet in your wallet, then try signing in again.',
+          )
+          return false
+        }
+      }
+
       const jwtToken = await AuthService.authenticateWithWallet(
         account,
-        chainId,
+        defaultChain.id,
       )
       if (typeof window !== 'undefined' && activeWallet?.id) {
         localStorage.setItem(LAST_WALLET_ID_KEY, activeWallet.id)
