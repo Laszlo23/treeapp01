@@ -1,6 +1,7 @@
 'use client'
 import { Spinner } from '@/components/ui/Spinner'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { FaChevronRight } from 'react-icons/fa'
@@ -169,8 +170,41 @@ export default function HomePage() {
   return (
     <>
       <AppHeader />
-      <div className="flex flex-col gap-6 p-6 mb-30">
-        <div className="mb-4 flex flex-col gap-2.5 rounded-[20px] bg-warm-grey p-5">
+      <div className="mb-30 flex flex-col gap-6 p-6">
+        <section className="relative overflow-hidden rounded-3xl border border-white/60 bg-gradient-to-br from-white via-[#f9fcf6] to-[#e8f2dc]/95 p-6 shadow-[0_24px_60px_rgba(48,62,26,0.14)]">
+          <div className="pointer-events-none absolute -right-16 top-0 h-44 w-44 rounded-full bg-[#DFEA8A]/45 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 -left-10 h-40 w-40 rounded-full bg-[#6B8C3B]/22 blur-3xl" />
+          <div className="relative">
+            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#435F24]">
+              Welcome
+            </p>
+            <h2 className="mt-2 text-2xl font-black leading-tight tracking-tight text-[#0f160c]">
+              Verify real planting.
+              <span className="block text-[#435F24]">Earn rewards.</span>
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-[#5c534a]">
+              TreeGens ties your mangrove and forest clips to on-chain proof —
+              loyalty points, MGRO claims, and verifier-reviewed submissions in
+              one flow.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={appConfig.routes.NewPlant}
+                className="tg-cta inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-wide text-[#16210c]"
+              >
+                Plant trees
+              </Link>
+              <Link
+                href={appConfig.routes.Earn}
+                className="tg-card inline-flex items-center justify-center rounded-2xl border-[#435F24]/20 px-5 py-3 text-sm font-bold text-[#303E1A]"
+              >
+                Earn & tasks
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <div className="mb-4 flex flex-col gap-2.5 rounded-[20px] bg-warm-grey p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
           <h3 className="text-2xl font-bold">Overview</h3>
 
           <div className="flex flex-col gap-2.5">

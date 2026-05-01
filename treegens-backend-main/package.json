@@ -18,6 +18,7 @@
     "migrate:status": "node dist/scripts/migrate.js status",
     "test": "MONGODB_URI=mongodb://127.0.0.1:27017/treegens-test PINATA_JWT=test-pinata-jwt tsx --test src/**/*.test.ts",
     "roboflow:smoke": "MONGODB_URI=mongodb://127.0.0.1:27017/roboflow-smoke PINATA_JWT=roboflow-smoke tsx src/scripts/roboflowMangroveSmoke.ts",
+    "ai:plant-smoke": "tsx src/scripts/aiPlantUltralyticsSmoke.ts",
     "start:worker": "RUN_REWARD_CLAIM_WORKER=true node dist/workers/rewardClaimWorker.js",
     "start:slash-worker": "RUN_SLASH_WORKER=true node dist/workers/slashWorker.js"
   },
@@ -41,7 +42,8 @@
     "node-cron": "^4.2.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

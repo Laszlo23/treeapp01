@@ -21,6 +21,7 @@ export function useIsDynamicRoute() {
   const { routes } = appConfig
   const isLeaderboardRoute =
     pathname === routes.Leaderboard || pathname === routes.LeaderboardFunded
+  const isProfileRoute = pathname === routes.Profile
 
   const isDynamicTitleRoute =
     !isTabShellRoute && appConfig.dynamicTitleRoutes.includes(dynamicPathname)
@@ -31,6 +32,7 @@ export function useIsDynamicRoute() {
     isDynamicTitleRoute,
     isTabShellRoute,
     isLeaderboardRoute,
+    isProfileRoute,
     dynamicTitle,
     dynamicPathname,
   }

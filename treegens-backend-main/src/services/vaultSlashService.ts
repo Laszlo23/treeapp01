@@ -21,10 +21,10 @@ class VaultSlashService {
   private wallet: Wallet | null = null
 
   private ensureReady(): { provider: JsonRpcProvider; wallet: Wallet } {
-    const rpcUrl = env.BASE_SEPOLIA_RPC_URL
+    const rpcUrl = env.BASE_RPC_URL
     if (!rpcUrl) {
       throw new Error(
-        'BASE_SEPOLIA_RPC_URL (or RPC_URL) is required for vault slashing',
+        'BASE_RPC_URL (or RPC_URL) is required for vault slashing',
       )
     }
     const pk = env.TGN_VAULT_SLASHER_PRIVATE_KEY?.trim()
@@ -42,7 +42,7 @@ class VaultSlashService {
 
   isConfigured(): boolean {
     return Boolean(
-      env.BASE_SEPOLIA_RPC_URL?.trim() &&
+      env.BASE_RPC_URL?.trim() &&
         env.TGN_VAULT_SLASHER_PRIVATE_KEY?.trim(),
     )
   }

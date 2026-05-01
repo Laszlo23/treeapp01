@@ -82,6 +82,30 @@ export interface IFundedLeaderboardResponse {
   }
 }
 
+/** GET /api/users/:wallet/public */
+export interface IPublicProfilePayload {
+  user: {
+    walletAddress: string
+    name?: string
+    treesPlanted?: number
+    isVerifier?: boolean
+    verifierSince?: string
+    createdAt: string
+    socialPointsTotal?: number
+  }
+  burns: {
+    totalBurnedMgroWei: string
+    burnCount: number
+    updatedAt: string
+  } | null
+  approvedSubmissionCount: number
+}
+
+export interface IPublicProfileEnvelope {
+  message: string
+  data: IPublicProfilePayload
+}
+
 export interface IUserProfile {
   _id: string
   walletAddress: string
@@ -92,11 +116,49 @@ export interface IUserProfile {
   /** MGRO claimed (wei), as returned by the API */
   tokensClaimed?: string | number
   treesPlanted?: number
+  /** Loyalty points (social quests); convertible to TGN per program rules */
+  socialPointsTotal?: number
+  completedSocialTasks?: Array<{ taskKey: string; completedAt: string }>
   // Verifier related fields
   isVerifier?: boolean
   verifierSince?: string
+  /** Off-chain vote proxy — wallet address of verifier receiving delegated credit */
+  verifierDelegate?: string | null
+  verifierDelegateSetAt?: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface ISocialRewardsTask {
+  taskKey: string
+  title: string
+  description: string
+  points: number
+  completed: boolean
+  completedAt: string | null
+  /** ISO start time for timed quests (e.g. X Space). */
+  startsAt?: string | null
+  /** Retired catalog key — show history only; do not allow re-completion. */
+  retired?: boolean
+}
+
+export interface ISocialRewardsSummary {
+  pointsTotal: number
+  tasks: ISocialRewardsTask[]
+}
+
+export interface ISocialRewardsEnvelope {
+  message: string
+  data: ISocialRewardsSummary
+}
+
+export interface ICompleteSocialTaskEnvelope {
+  message: string
+  data: {
+    newlyCompleted: boolean
+    pointsEarned: number
+    pointsTotal: number
+  }
 }
 
 export enum VideoStatus {
@@ -283,8 +345,10 @@ export interface ISubmissionDoc {
   reviewedAt?: string
   treesPlanted?: number
   planterRewardClaimedWei?: string
-  /** Backend may expose tree type on submission */
+  /** Backend may expose tree type on submission (camelCase schema) */
   treeType?: string
+  /** Alternate key from some payloads */
+  treetype?: string
   votes?: Vote[]
   /** Mangrove plant AI count / routing (present after plant upload for mangrove) */
   aiVerification?: ISubmissionAiVerification

@@ -158,9 +158,11 @@ export const verifyInstructions: Record<'English' | 'Swahili', ReactNode> = {
       <div className="flex flex-col gap-2">
         <h3>
           <span className="font-bold">Step 2{`)`}</span> After planting, film
-          the propagules planted in one continuous direction e.g. from left to
-          right or up to down. Do not go left right and then left again, for
-          example. If you mangrove propagule goes out of the screen & then back
+          in <strong>one continual direction only</strong>—either left to right{' '}
+          <em>or</em> right to left for the whole clip (not both, and don’t scan
+          back and forth). The same idea applies vertically (e.g. only upward or
+          only downward). For example, do not pan left‑to‑right and then reverse.
+          If a mangrove propagule goes out of the screen & then back
           in, it will be counted twice & you will need to film the trees again.
         </h3>
       </div>

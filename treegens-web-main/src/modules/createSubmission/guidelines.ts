@@ -13,6 +13,11 @@ export const guidelines = [
     description: 'Hold your phone still during recording',
   },
   {
+    title: 'One continuous direction',
+    description:
+      'Pan in one smooth direction only—either left-to-right or right-to-left across the scene. Don’t reverse mid-clip or scan back and forth.',
+  },
+  {
     title: 'Good lighting',
     description: 'Record during daylight for clarity',
   },

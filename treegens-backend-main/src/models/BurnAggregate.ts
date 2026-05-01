@@ -8,7 +8,6 @@ const burnAggregateSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     /** Cumulative MGRO burned by this wallet (wei, decimal string). */
     totalBurnedMgroWei: {
@@ -26,7 +25,6 @@ const burnAggregateSchema = new mongoose.Schema(
   { timestamps: true },
 )
 
-burnAggregateSchema.index({ walletAddress: 1 })
 burnAggregateSchema.index({ updatedAt: -1 })
 
 export default mongoose.model('BurnAggregate', burnAggregateSchema)

@@ -19,6 +19,25 @@ export type PlanterSubmissionGroup = {
   submissionStatus: SubmissionStatus
   votes: Vote[]
   aiVerification?: ISubmissionAiVerification
+  /** Mirrors Submission document — fallback if clip mapper missed fields */
+  submissionTreesPlanted?: number
+  submissionTreeSpecies?: string
+}
+
+function readSubmissionTreeSpecies(
+  doc: ISubmissionDoc & Record<string, unknown>,
+): string | undefined {
+  const a = typeof doc.treeType === 'string' ? doc.treeType.trim() : ''
+  const b = typeof doc.treetype === 'string' ? doc.treetype.trim() : ''
+  return a || b || undefined
+}
+
+function readSubmissionTreesPlanted(
+  doc: ISubmissionDoc & Record<string, unknown>,
+): number | undefined {
+  const n = doc.treesPlanted
+  if (typeof n !== 'number' || Number.isNaN(n)) return undefined
+  return Math.max(0, Math.floor(n))
 }
 
 export function submissionDocToPlanterGroup(
@@ -31,6 +50,8 @@ export function submissionDocToPlanterGroup(
   const plantVideo = videos.find(v => v.type === VideoType.PLANT)
   const location =
     plantVideo?.reverseGeocode || landVideo?.reverseGeocode || undefined
+  const submissionTreesPlanted = readSubmissionTreesPlanted(doc)
+  const submissionTreeSpecies = readSubmissionTreeSpecies(doc)
   return {
     submissionId: String(doc._id),
     userWalletAddress: doc.userWalletAddress,
@@ -40,6 +61,8 @@ export function submissionDocToPlanterGroup(
     plantVideo,
     submissionStatus: doc.status,
     votes: doc.votes ?? [],
+    submissionTreesPlanted,
+    submissionTreeSpecies,
     aiVerification:
       typeof doc.aiVerification === 'object' && doc.aiVerification != null
         ? (doc.aiVerification as ISubmissionAiVerification)

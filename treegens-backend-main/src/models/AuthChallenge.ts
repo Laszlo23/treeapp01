@@ -6,7 +6,6 @@ const authChallengeSchema = new mongoose.Schema(
       type: String,
       required: true,
       lowercase: true,
-      index: true,
     },
     nonce: {
       type: String,

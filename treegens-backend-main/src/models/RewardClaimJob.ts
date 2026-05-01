@@ -21,7 +21,6 @@ const rewardClaimJobSchema = new mongoose.Schema(
       type: String,
       required: true,
       lowercase: true,
-      index: true,
     },
     claimType: {
       type: String,

@@ -1,10 +1,8 @@
 import { VideoType } from '@/services/videoService'
 import { ISubmissionGroup, IUserProfile, IVideo, VideoStatus } from '@/types'
 
-export const isDevelopment = process.env.NEXT_PUBLIC_NODE_ENV === 'development'
-
 const baseURL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://treegens-be.generalmagic.io'
+  process.env.NEXT_PUBLIC_API_URL || 'https://treegens.app'
 const VIDEOS_CACHE_KEY = 'treegens_videos'
 const USER_CACHE_KEY = 'treegens_cached_user'
 

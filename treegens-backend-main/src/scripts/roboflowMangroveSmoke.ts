@@ -49,7 +49,12 @@ async function main() {
     endpoint.specification ? '(+ specification file)' : '',
   )
 
-  const frame = extractMiddleFrameJpegFromMp4(videoBuffer)
+  const frame = extractMiddleFrameJpegFromMp4(videoBuffer, {
+    filename: abs.split(/[/\\]/).pop(),
+    contentType: abs.toLowerCase().endsWith('.webm')
+      ? 'video/webm'
+      : 'video/mp4',
+  })
   console.log(
     'Middle JPEG:',
     frame.jpeg.length,

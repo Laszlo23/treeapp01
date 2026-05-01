@@ -3,6 +3,7 @@
 import { ClaimCard } from '@/components/submission-detail/ClaimCard'
 import { LandVideoSection } from '@/components/submission-detail/LandVideoSection'
 import { PlantVideoSection } from '@/components/submission-detail/PlantVideoSection'
+import { SubmissionDmThread } from '@/components/submission-detail/SubmissionDmThread'
 import { RejectionFeedbackFooter } from '@/components/submission-detail/RejectionFeedbackFooter'
 import { SubmissionStatusBadges } from '@/components/submission-detail/SubmissionStatusBadges'
 import { Spinner } from '@/components/ui/Spinner'
@@ -315,7 +316,11 @@ export default function SubmissionDetailPage() {
               locationText={locationText}
               timeAgo={plantVideoTimestamp}
               aiVerification={group.aiVerification}
+              submissionTreesPlanted={group.submissionTreesPlanted}
+              submissionTreeSpecies={group.submissionTreeSpecies}
             />
+
+            <SubmissionDmThread submissionId={id} />
 
             {group.submissionStatus === 'approved' ? (
               isClaimCompleted ? (

@@ -2,7 +2,10 @@
 
 import { ApproveSubmissionModal } from '@/components/ApproveSubmissionModal'
 import { RejectSubmissionModal } from '@/components/RejectSubmissionModal'
+import { AiVerdictCard } from '@/components/submission-detail/AiVerdictCard'
+import { PlantingCountCard } from '@/components/submission-detail/PlantingCountCard'
 import { RewardClaimStatusPill } from '@/components/submission-detail/RewardClaimStatusPill'
+import { SubmissionDmThread } from '@/components/submission-detail/SubmissionDmThread'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useUser } from '@/contexts/UserProvider'
@@ -30,6 +33,7 @@ import {
 } from '@/utils/submissionPlanterGroup'
 import { formatTimeAgo } from '@/utils/timeAgo'
 import { getVerifierRewardFromStatus } from '@/utils/verifierRewardSlice'
+import { apiErrorMessage, notifyError } from '@/utils/apiErrorMessage'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -309,9 +313,7 @@ export default function ReviewSubmission() {
       const { data } = await getRewardStatus(submissionId)
       setVerifierReward(data.data)
     } catch (claimErr: unknown) {
-      const msg =
-        claimErr instanceof Error ? claimErr.message : 'Failed to claim reward'
-      toast.error(msg)
+      notifyError(apiErrorMessage(claimErr, 'Claim failed'))
     } finally {
       setClaimingVerifier(false)
     }
@@ -422,25 +424,49 @@ export default function ReviewSubmission() {
           <VideoMetaBlock video={landVideo} />
         </section>
 
-        <section className="mt-6 space-y-2.5">
-          <div className="flex items-center justify-between gap-1">
-            <h2 className="text-lg font-bold tracking-wide text-[#4d341e]">
-              Plant
-            </h2>
-            {plantVideo ? (
-              <p className="text-sm font-semibold capitalize text-[#1f2937]">
-                {plantVideo.treesPlanted}
-                {plantVideo.treetype?.trim()
-                  ? ` ${plantVideo.treetype.trim()}`
-                  : ''}
-              </p>
-            ) : null}
-          </div>
+        <section className="mt-6 space-y-3">
+          <h2 className="text-lg font-bold tracking-wide text-[#4d341e]">
+            Plant
+          </h2>
+          {(plantVideo || submissionGroup?.submissionTreesPlanted != null) &&
+          submissionGroup ? (
+            <PlantingCountCard
+              declaredTrees={
+                typeof plantVideo?.treesPlanted === 'number'
+                  ? plantVideo.treesPlanted
+                  : submissionGroup.submissionTreesPlanted
+              }
+              species={
+                plantVideo?.treetype?.trim() ||
+                submissionGroup.submissionTreeSpecies ||
+                null
+              }
+              aiVerification={submissionGroup.aiVerification}
+            />
+          ) : null}
           <VideoPanel
             video={plantVideo}
             emptyMessage="No plant video submitted"
           />
           <VideoMetaBlock video={plantVideo} />
+          {submissionGroup &&
+          submissionGroup.aiVerification &&
+          (
+            submissionGroup.plantVideo?.treetype?.toLowerCase() === 'mangrove' ||
+            submissionGroup.submissionTreeSpecies?.toLowerCase() === 'mangrove'
+          ) ? (
+            <AiVerdictCard
+              aiVerification={submissionGroup.aiVerification}
+              declaredTrees={
+                typeof plantVideo?.treesPlanted === 'number'
+                  ? plantVideo.treesPlanted
+                  : submissionGroup.submissionTreesPlanted
+              }
+            />
+          ) : null}
+          {submissionGroup?.submissionId ? (
+            <SubmissionDmThread submissionId={submissionGroup.submissionId} />
+          ) : null}
         </section>
       </main>
 
@@ -529,11 +555,7 @@ export default function ReviewSubmission() {
             await load(true)
           } catch (e) {
             console.error(e)
-            toast.error(
-              e instanceof Error
-                ? e.message
-                : 'Failed to submit vote. Please try again.',
-            )
+            notifyError(apiErrorMessage(e, 'Vote failed'))
           }
         }}
       />
@@ -543,7 +565,7 @@ export default function ReviewSubmission() {
         onReject={async ({ reasons }) => {
           const cleaned = reasons.map(r => String(r).trim()).filter(Boolean)
           if (cleaned.length === 0) {
-            toast.error('Add at least one reason to reject.')
+            notifyError('Add a rejection reason')
             return
           }
           try {
@@ -554,11 +576,7 @@ export default function ReviewSubmission() {
             await load(true)
           } catch (e) {
             console.error(e)
-            toast.error(
-              e instanceof Error
-                ? e.message
-                : 'Failed to submit vote. Please try again.',
-            )
+            notifyError(apiErrorMessage(e, 'Vote failed'))
           }
         }}
       />

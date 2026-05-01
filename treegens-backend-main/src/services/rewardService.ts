@@ -1260,7 +1260,7 @@ export class RewardService {
   }> {
     if (!this.mintService.isConfigured()) {
       throw new Error(
-        'MGRO rewards are not configured (set BASE_SEPOLIA_RPC_URL and MGRO_MINTER_PRIVATE_KEY)',
+        'MGRO rewards are not configured (set BASE_RPC_URL and MGRO_MINTER_PRIVATE_KEY)',
       )
     }
 

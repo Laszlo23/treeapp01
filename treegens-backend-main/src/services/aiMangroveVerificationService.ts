@@ -95,6 +95,31 @@ function extractFromPaths(
   return undefined
 }
 
+/**
+ * Roboflow Serverless workflows often return `verification_json` as a JSON **string**
+ * (not a nested object). Parse and surface it as an extra root so dot-paths like
+ * `seedling_count` / `mangrove_count` resolve without custom env wiring.
+ */
+function rootsFromParsedVerificationJsonString(
+  root: unknown,
+): unknown[] {
+  if (!root || typeof root !== 'object' || Array.isArray(root)) return []
+  const rec = root as Record<string, unknown>
+  const vj = rec.verification_json
+  if (typeof vj !== 'string') return []
+  const t = vj.trim()
+  if (!t.startsWith('{')) return []
+  try {
+    const parsed = JSON.parse(t) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return [parsed]
+    }
+  } catch {
+    /* ignore malformed workflow output */
+  }
+  return []
+}
+
 /** Roboflow / workflow payloads often expose results under `outputs` (array or object). */
 export function collectAiResponseRoots(raw: unknown): unknown[] {
   const roots: unknown[] = [raw]
@@ -108,6 +133,13 @@ export function collectAiResponseRoots(raw: unknown): unknown[] {
       }
     } else if (outputs && typeof outputs === 'object') {
       roots.push(outputs)
+    }
+  }
+
+  const snapshot = [...roots]
+  for (const root of snapshot) {
+    for (const extra of rootsFromParsedVerificationJsonString(root)) {
+      roots.push(extra)
     }
   }
 
@@ -194,10 +226,36 @@ async function verifyMangrovePlantVideoUltralytics(opts: {
     return { ok: false, skipped: true, reason: 'missing_path' }
   }
 
+  let uploadBody = opts.videoBuffer
+  let uploadFilename = opts.filename || 'plant.mp4'
+  let uploadContentType = opts.contentType || 'video/mp4'
+
+  if (env.AI_ULTRALYTICS_INPUT_MODE === 'middle_frame_jpeg') {
+    try {
+      const frame = extractMiddleFrameJpegFromMp4(opts.videoBuffer, {
+        filename: opts.filename,
+        contentType: opts.contentType,
+      })
+      uploadBody = frame.jpeg
+      uploadFilename = 'mangrove-frame.jpg'
+      uploadContentType = 'image/jpeg'
+    } catch (e: unknown) {
+      return {
+        ok: false,
+        skipped: false,
+        error: `video frame extraction failed: ${String(
+          e && typeof e === 'object' && 'message' in e
+            ? (e as { message: string }).message
+            : e,
+        )}`,
+      }
+    }
+  }
+
   const form = new FormData()
-  form.append(env.AI_VIDEO_FORM_FIELD_NAME, opts.videoBuffer, {
-    filename: opts.filename || 'plant.mp4',
-    contentType: opts.contentType || 'video/mp4',
+  form.append(env.AI_VIDEO_FORM_FIELD_NAME, uploadBody, {
+    filename: uploadFilename,
+    contentType: uploadContentType,
   })
   appendUltralyticsPredictFormFields(form)
 
@@ -310,7 +368,10 @@ async function verifyMangrovePlantVideoRoboflow(opts: {
   let frame: ReturnType<typeof extractMiddleFrameJpegFromMp4> | undefined
   if (!workflowImageUrl) {
     try {
-      frame = extractMiddleFrameJpegFromMp4(opts.videoBuffer)
+      frame = extractMiddleFrameJpegFromMp4(opts.videoBuffer, {
+        filename: opts.filename,
+        contentType: opts.contentType,
+      })
     } catch (e: unknown) {
       return {
         ok: false,

@@ -38,12 +38,19 @@ type SubmissionLike = {
   updatedAt?: string
   treesPlanted?: number
   treeType?: string
+  /** Some API layers use lowercase */
+  treetype?: string
   votes?: Vote[]
   land?: ClipLike
   plant?: ClipLike
   yesCount?: number
   noCount?: number
   totalVotes?: number
+}
+
+function submissionTreeSpecies(s: SubmissionLike): string | undefined {
+  const raw = (s.treeType || s.treetype || '').trim()
+  return raw || undefined
 }
 
 function clipToVideo(
@@ -72,8 +79,13 @@ function clipToVideo(
       longitude: Number(gps.longitude ?? 0),
     },
     submissionId: sid,
-    treesPlanted: slot === 'plant' ? submission.treesPlanted : undefined,
-    treetype: slot === 'plant' ? submission.treeType : undefined,
+    treesPlanted:
+      slot === 'plant'
+        ? typeof submission.treesPlanted === 'number'
+          ? submission.treesPlanted
+          : undefined
+        : undefined,
+    treetype: slot === 'plant' ? submissionTreeSpecies(submission) : undefined,
     votes: submission.votes,
     reverseGeocode: clip.reverseGeocode,
   }

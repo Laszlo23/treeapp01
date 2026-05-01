@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
-import { ThirdwebProvider } from 'thirdweb/react'
 import { AuthGuard } from '@/components/AuthGuard'
+import { MobileAppShell } from '@/components/Layout/MobileAppShell'
 import { ThirdwebAutoConnect } from '@/components/providers/ThirdwebAutoConnect'
-import ErudaConsole from '@/components/ErudaConsole'
+import { TreeGensThirdwebProvider } from '@/components/providers/TreeGensThirdwebProvider'
 import PWAInstaller from '@/components/PWAInstaller'
 import { AuthProvider } from '@/contexts/AuthProvider'
 import { ConnectivityProvider } from '@/contexts/ConnectivityProvider'
+import { NotificationProvider } from '@/contexts/NotificationProvider'
 import { UserProvider } from '@/contexts/UserProvider'
 import './globals.css'
 
@@ -36,26 +37,24 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ErudaConsole>
-          <ThirdwebProvider>
-            <ThirdwebAutoConnect />
-            <ConnectivityProvider>
-              <AuthProvider>
-                <UserProvider>
+        <TreeGensThirdwebProvider>
+          <ThirdwebAutoConnect />
+          <ConnectivityProvider>
+            <AuthProvider>
+              <UserProvider>
+                <NotificationProvider>
                   <AuthGuard>
                     <PWAInstaller />
-                    <div className="fixed inset-0 w-full overflow-y-auto md:hidden">
-                      {children}
-                    </div>
-                    <div className="fixed inset-0 items-center justify-center hidden md:flex">
+                    <MobileAppShell>{children}</MobileAppShell>
+                    <div className="fixed inset-0 hidden items-center justify-center md:flex">
                       You can see the app only on mobile
                     </div>
                   </AuthGuard>
-                </UserProvider>
-              </AuthProvider>
-            </ConnectivityProvider>
-          </ThirdwebProvider>
-        </ErudaConsole>
+                </NotificationProvider>
+              </UserProvider>
+            </AuthProvider>
+          </ConnectivityProvider>
+        </TreeGensThirdwebProvider>
         <Toaster
           position="top-center"
           toastOptions={{

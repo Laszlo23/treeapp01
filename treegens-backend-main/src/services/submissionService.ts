@@ -10,6 +10,7 @@ import {
   stringifyAiRawForStorage,
   verifyMangrovePlantVideo,
 } from './aiMangroveVerificationService'
+import { enqueueNotification } from './notificationService'
 import RewardService from './rewardService'
 import { applyMinorityPenaltiesForVotes } from './verifierPenaltyService'
 
@@ -269,7 +270,10 @@ class SubmissionService {
     const longitude = Number(gps?.longitude ?? NaN)
 
     const snapshotBase = (): Record<string, unknown> => ({
-      provider: 'buildingculture',
+      provider:
+        env.AI_PROVIDER === 'roboflow_workflow'
+          ? 'roboflow_workflow'
+          : 'ultralytics',
       walletAddress: userWalletAddress,
       ...(Number.isFinite(latitude) && Number.isFinite(longitude)
         ? {
@@ -348,6 +352,16 @@ class SubmissionService {
 
     try {
       await submission.save()
+      if (normalizedTreeType === MANGROVE_TREE_TYPE && submission.aiVerification) {
+        void enqueueNotification({
+          recipientWalletAddress: userWalletAddress,
+          kind: 'ai_verification',
+          title: 'AI verification update',
+          body: 'Your mangrove clip was analyzed by TreeGens AI.',
+          link: `/submissions/${String(submissionOid)}`,
+          payload: { submissionId: String(submissionOid) },
+        }).catch(() => {})
+      }
       if (
         submission.status === 'approved' &&
         normalizedTreeType === MANGROVE_TREE_TYPE
@@ -660,7 +674,23 @@ class SubmissionService {
         .filter(r => typeof r === 'string' && r.trim().length > 0)
         .slice(0, 10)
     }
-    submission.votes.push({ voterWalletAddress, vote, reasons: reasonsArr })
+
+    const voterNorm = voterWalletAddress.toLowerCase()
+    const delegators = await User.find({
+      verifierDelegate: voterNorm,
+    })
+      .select({ walletAddress: 1 })
+      .lean()
+    const delegatedFor = delegators.map(d =>
+      String(d.walletAddress || '').toLowerCase(),
+    )
+
+    submission.votes.push({
+      voterWalletAddress,
+      vote,
+      reasons: reasonsArr,
+      delegatedFor,
+    })
     await submission.save()
     return this.attemptResolveSubmission(submissionId, {
       knownTotalVerifiers: totalVerifiers,
@@ -715,6 +745,25 @@ class SubmissionService {
     submission.status = majorityVote === 'yes' ? 'approved' : 'rejected'
     submission.reviewedAt = new Date()
     await submission.save()
+
+    const planter = String(submission.userWalletAddress || '').toLowerCase()
+    if (planter) {
+      void enqueueNotification({
+        recipientWalletAddress: planter,
+        kind: 'submission_outcome',
+        title:
+          majorityVote === 'yes' ? 'Submission approved' : 'Submission reviewed',
+        body:
+          majorityVote === 'yes'
+            ? 'Verifier consensus approved your planting submission.'
+            : 'Your submission was reviewed by verifiers.',
+        link: `/submissions/${String(submission._id)}`,
+        payload: {
+          submissionId: String(submission._id),
+          status: submission.status,
+        },
+      }).catch(() => {})
+    }
 
     await this.applyMinorityPenalties(submission, majorityVote)
 

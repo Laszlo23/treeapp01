@@ -32,9 +32,9 @@ const SubmissionVideoInfo = (props: { video?: IVideo }) => {
             <span className="font-medium">Address:</span> {video.reverseGeocode}
           </p>
         )}
-        {video.treesPlanted && (
+        {video.treesPlanted != null && (
           <p>
-            <span className="font-medium">Trees Planted:</span>{' '}
+            <span className="font-medium">Trees / mangroves (declared):</span>{' '}
             {video.treesPlanted}
           </p>
         )}

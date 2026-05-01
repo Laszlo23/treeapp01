@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express'
 import mongoose from 'mongoose'
 import { authenticate, requireVerifier } from '../middleware/auth'
 import {
+  conversationMessageLimiter,
   submissionUploadLimiter,
   submissionVoteLimiter,
 } from '../middleware/rateLimits'
@@ -12,6 +13,7 @@ import {
   validateSubmissionUpload,
 } from '../middleware/validation'
 import User from '../models/User'
+import * as conversationService from '../services/conversationService'
 import HealthCheckService from '../services/healthCheckService'
 import SubmissionService from '../services/submissionService'
 import {
@@ -466,6 +468,59 @@ router.post(
  *       404:
  *         description: Not found
  */
+
+router.get(
+  '/:submissionId/conversation',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const { submissionId } = req.params
+      if (!mongoose.Types.ObjectId.isValid(submissionId)) {
+        return sendBadRequest(res, 'Invalid submissionId')
+      }
+      const wallet = (req.user!.walletAddress as string).toLowerCase()
+      const data = await conversationService.getOrCreateConversation(
+        submissionId,
+        wallet,
+      )
+      return sendSuccess(res, 'Conversation', data)
+    } catch (error: any) {
+      console.error('conversation get error:', error)
+      if (error.message === 'Access denied') {
+        return sendError(res, error.message, 403)
+      }
+      return sendError(res, error.message || 'Failed to load conversation')
+    }
+  },
+)
+
+router.post(
+  '/:submissionId/conversation/messages',
+  authenticate,
+  conversationMessageLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const { submissionId } = req.params
+      if (!mongoose.Types.ObjectId.isValid(submissionId)) {
+        return sendBadRequest(res, 'Invalid submissionId')
+      }
+      const wallet = (req.user!.walletAddress as string).toLowerCase()
+      const body = typeof req.body?.body === 'string' ? req.body.body : ''
+      const msg = await conversationService.postMessage(
+        submissionId,
+        wallet,
+        body,
+      )
+      return sendCreated(res, 'Message sent', msg)
+    } catch (error: any) {
+      console.error('conversation message error:', error)
+      if (error.message === 'Access denied') {
+        return sendError(res, error.message, 403)
+      }
+      return sendBadRequest(res, error.message || 'Failed to send')
+    }
+  },
+)
 
 router.get(
   '/:submissionId',

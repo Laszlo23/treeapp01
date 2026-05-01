@@ -23,7 +23,7 @@ class VerifierService {
   private submissionService: SubmissionService
   private isEnabled: boolean
   constructor() {
-    const rpcUrl = env.BASE_SEPOLIA_RPC_URL
+    const rpcUrl = env.BASE_RPC_URL
     this.isEnabled = Boolean(rpcUrl)
 
     this.provider = rpcUrl ? new ethers.JsonRpcProvider(rpcUrl) : null
@@ -47,7 +47,7 @@ class VerifierService {
   private ensureEnabled() {
     if (!this.isEnabled || !this.contract) {
       throw new Error(
-        'Verifier functionality is disabled (missing BASE_SEPOLIA_RPC_URL)',
+        'Verifier functionality is disabled (missing BASE_RPC_URL)',
       )
     }
   }

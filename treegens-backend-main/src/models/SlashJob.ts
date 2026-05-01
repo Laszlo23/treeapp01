@@ -21,7 +21,6 @@ const slashJobSchema = new mongoose.Schema(
       type: String,
       required: true,
       lowercase: true,
-      index: true,
     },
     reason: {
       type: String,

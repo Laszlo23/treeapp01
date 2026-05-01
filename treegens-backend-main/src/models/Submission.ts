@@ -34,6 +34,8 @@ const voteSchema = new mongoose.Schema(
     },
     vote: { type: String, enum: ['yes', 'no'], required: true },
     reasons: { type: [String], default: [] },
+    /** Wallets that delegated off-chain stake voting power to this verifier for this ballot. */
+    delegatedFor: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now },
   },
   { _id: false },
@@ -56,7 +58,7 @@ const aiVerificationSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      default: 'buildingculture',
+      default: 'ultralytics',
     },
     countedMangroves: { type: Number, min: 0, required: false },
     confidence: { type: Number, min: 0, max: 1, required: false },
@@ -94,7 +96,6 @@ const submissionSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     status: {
       type: String,

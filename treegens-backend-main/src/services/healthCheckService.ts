@@ -6,6 +6,7 @@ import HealthCheck from '../models/HealthCheck'
 import RewardAllocation from '../models/RewardAllocation'
 import Submission from '../models/Submission'
 import User from '../models/User'
+import { enqueueNotification } from './notificationService'
 import { haversineMeters } from '../utils/geo'
 import { determineMajorityVote } from '../utils/verifierMajority'
 import {
@@ -299,10 +300,21 @@ export class HealthCheckService {
         .slice(0, 10)
     }
 
+    const voterNorm = input.voterWalletAddress.toLowerCase()
+    const delegRows = await User.find({
+      verifierDelegate: voterNorm,
+    })
+      .select({ walletAddress: 1 })
+      .lean()
+    const delegatedFor = delegRows.map(d =>
+      String(d.walletAddress || '').toLowerCase(),
+    )
+
     hc.votes.push({
       voterWalletAddress: input.voterWalletAddress,
       vote: input.vote,
       reasons: reasonsArr,
+      delegatedFor,
     })
     await hc.save()
 
@@ -356,6 +368,28 @@ export class HealthCheckService {
     hc.status = majorityVote === 'yes' ? 'approved' : 'rejected'
     hc.reviewedAt = new Date()
     await hc.save()
+
+    const planter = String(submission.userWalletAddress || '').toLowerCase()
+    if (planter) {
+      void enqueueNotification({
+        recipientWalletAddress: planter,
+        kind: 'health_check_outcome',
+        title:
+          majorityVote === 'yes'
+            ? 'Health check approved'
+            : 'Health check reviewed',
+        body:
+          majorityVote === 'yes'
+            ? 'Your survival verification passed verifier consensus.'
+            : 'Your health check was reviewed.',
+        link: `/submissions/${String(submission._id)}`,
+        payload: {
+          submissionId: String(submission._id),
+          healthCheckId: String(hc._id),
+          status: hc.status,
+        },
+      }).catch(() => {})
+    }
 
     await applyMinorityPenaltiesForVotes(
       String(hc.submissionId),

@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/Button'
 import { useRouter } from 'next/navigation'
 import cn from 'classnames'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { GrLocation } from 'react-icons/gr'
 import { HiArrowLeft, HiArrowPath } from 'react-icons/hi2'
@@ -11,6 +11,7 @@ import { IoVideocamOutline } from 'react-icons/io5'
 import { MdClose } from 'react-icons/md'
 import { guidelines } from '@/modules/createSubmission/guidelines'
 import UploadProgressModal from '@/components/Modals/UploadProgressModal'
+import { SubmissionCompleteCelebration } from '@/components/submission/SubmissionCompleteCelebration'
 import { useConnectivity } from '@/contexts/ConnectivityProvider'
 import { useUser } from '@/contexts/UserProvider'
 import { useGeolocation } from '@/hooks/useGeolocation'
@@ -50,6 +51,10 @@ export default function NewPlant() {
     durationMs?: number
   }>({})
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [showSubmissionCelebrate, setShowSubmissionCelebrate] = useState(false)
+  const [celebrationVariant, setCelebrationVariant] = useState<
+    'submitted' | 'queued'
+  >('submitted')
   const [validationError, setValidationError] = useState<string>('')
   const [isMounted, setIsMounted] = useState(false)
   const [isQueueing, setIsQueueing] = useState(false)
@@ -67,6 +72,10 @@ export default function NewPlant() {
   )
 
   const router = useRouter()
+
+  const dismissSubmissionCelebrate = useCallback(() => {
+    setShowSubmissionCelebrate(false)
+  }, [])
 
   // Use the custom hook instead of managing state manually
   const {
@@ -487,8 +496,10 @@ export default function NewPlant() {
         setHasUploadedLandVideo(false)
         setServerSubmissionId(null)
         await refetchVideos()
-        toast.success('Submission complete')
         setShowUploadModal(false)
+        setCelebrationVariant('submitted')
+        setShowSubmissionCelebrate(true)
+        toast.success('Submission complete')
       } else {
         resetCompressionProgress()
         setShowUploadModal(true)
@@ -522,6 +533,9 @@ export default function NewPlant() {
         setHasUploadedLandVideo(false)
         setServerSubmissionId(null)
 
+        setShowUploadModal(false)
+        setCelebrationVariant('queued')
+        setShowSubmissionCelebrate(true)
         toast.success(
           'Plant video queued. It will upload automatically when you are back online.',
         )
@@ -906,6 +920,12 @@ export default function NewPlant() {
           </div>
         </div>
       ) : null}
+
+      <SubmissionCompleteCelebration
+        open={showSubmissionCelebrate}
+        onFinished={dismissSubmissionCelebrate}
+        variant={celebrationVariant}
+      />
 
       <UploadProgressModal
         isOpen={showUploadModal}

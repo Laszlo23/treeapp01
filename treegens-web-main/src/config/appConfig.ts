@@ -20,11 +20,20 @@ export const routes = {
   /** @deprecated Use SubmissionsReview */
   Submissions: '/submissions/review',
   Stake: '/stake',
+  Earn: '/earn',
+  Inbox: '/inbox',
   HealthChecks: '/health-checks',
   /** Dynamic — use buildReviewSubmissionPath */
   ReviewSubmission: '/submissions/review/[userWalletAddress]/[submissionId]',
   SubmissionDetail: '/submissions/[id]',
   RejectionFeedback: '/submissions/[id]/rejection-feedback',
+  /** Dynamic — public planter stats + burns */
+  PublicProfile: '/u/[walletAddress]',
+}
+
+export function buildPublicProfilePath(walletAddress: string) {
+  const w = walletAddress.trim()
+  return `/u/${encodeURIComponent(w)}`
 }
 
 /** @deprecated Use routes.Home */
@@ -37,20 +46,38 @@ export function buildReviewSubmissionPath(
   return `/submissions/review/${encodeURIComponent(userWalletAddress)}/${encodeURIComponent(submissionId)}`
 }
 
-/** Bottom tab shell (home, tutorial, leaderboard) — show AppBottomNav; AppHeader only on home */
-export const tabShellPaths: string[] = [
+/**
+ * Hub routes used for dynamic title / shell parity (bottom nav shows on all routes except `/auth`).
+ */
+export const bottomNavVisiblePaths: readonly string[] = [
   routes.Home,
+  routes.Profile,
+  routes.Earn,
+  routes.Inbox,
   routes.Tutorial,
   routes.TutorialVerify,
   routes.Leaderboard,
   routes.LeaderboardFunded,
+  routes.Stake,
+  routes.MySubmissions,
 ]
+
+/** @deprecated Use bottomNavVisiblePaths — kept for hooks / naming parity */
+export const tabShellPaths: string[] = [...bottomNavVisiblePaths]
+
+/** Bottom dock visible on every authenticated area except the login screen. */
+export function shouldShowBottomNav(pathname: string | null): boolean {
+  if (!pathname) return false
+  return pathname !== routes.Login
+}
 
 const dynamicTitleRoutesMap: Record<string, string> = {
   [routes.NewPlant]: 'Plant new trees',
   [routes.Stake]: 'Stake TGN',
   [routes.MySubmissions]: 'My submissions',
   [routes.Profile]: 'Profile',
+  [routes.Earn]: 'Earn',
+  [routes.Inbox]: 'Inbox',
   [routes.SubmissionsReview]: 'Review submissions',
   [routes.ReviewSubmission]: 'Review submission',
   [routes.SubmissionDetail]: 'Submission',
@@ -60,6 +87,7 @@ const dynamicTitleRoutesMap: Record<string, string> = {
   '/submissions/[id]/health-checks/create': 'New health check',
   '/health-checks/[healthCheckId]': 'Health check',
   '/submissions/review/health-checks/[healthCheckId]': 'Review health check',
+  [routes.PublicProfile]: 'Profile',
 }
 
 const dynamicTitleRoutes = Object.keys(dynamicTitleRoutesMap)

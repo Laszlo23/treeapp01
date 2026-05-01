@@ -1,84 +1,15 @@
 'use client'
 
+import { LeaderboardItem } from '@/components/LeaderboardItem'
 import { LeaderboardTopTabs } from '@/components/LeaderboardTopTabs'
-import { Address } from '@/components/Address'
+import { HubPageHeader } from '@/components/Layout/HubPageHeader'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useEffect, useState } from 'react'
 import { getFundedLeaderboard } from '@/services/app'
-import { axiosInstance } from '@/services/axiosInstance'
 import { IFundedLeaderboardUser } from '@/types'
-import { formatWeiToMgro } from '@/utils/formatWeiToMgro'
 
 const ITEMS_PER_LOAD = 10
-
-async function getFundedLeaderboardFallback(page: number, limit: number) {
-  const params = new URLSearchParams()
-  params.set('page', String(page))
-  params.set('limit', String(limit))
-  const res = await axiosInstance.get<{
-    message: string
-    data: Array<{
-      walletAddress: string
-      totalBurnedMgroWei: string
-      burnCount: number
-      updatedAt: string
-    }>
-  }>(`/api/users/leaderboard/trees-funded?${params.toString()}`)
-  const rows = res.data.data || []
-  const offset = (page - 1) * limit
-  const users = rows.map((u, i) => ({
-    _id: `${u.walletAddress}-${offset + i + 1}`,
-    walletAddress: u.walletAddress,
-    totalBurnedMgroWei: u.totalBurnedMgroWei,
-    burnCount: u.burnCount,
-    updatedAt: u.updatedAt,
-    rank: offset + i + 1,
-  }))
-  const hasMore = rows.length >= limit
-  return {
-    data: {
-      message: res.data.message,
-      data: {
-        users,
-        pagination: {
-          page,
-          limit,
-          total: hasMore ? page * limit + 1 : offset + rows.length,
-          pages: hasMore ? page + 1 : page,
-        },
-      },
-    },
-  }
-}
-
-function FundedTreesCard({
-  walletAddress,
-  totalBurnedMgroWei,
-}: {
-  walletAddress: string
-  totalBurnedMgroWei: string
-}) {
-  const burned = formatWeiToMgro(totalBurnedMgroWei)
-  return (
-    <div className="flex items-center justify-between rounded-xl border border-[#e5e7eb] bg-white px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="min-w-0">
-          <Address
-            address={walletAddress}
-            className="truncate text-sm font-semibold text-[#111827]"
-            blobbieSize={40}
-          />
-        </div>
-      </div>
-      <div className="text-right">
-        <p className="text-base font-bold text-[#4d341e]">
-          {burned.toLocaleString(undefined, { maximumFractionDigits: 2 })} MGRO
-        </p>
-      </div>
-    </div>
-  )
-}
 
 export default function LeaderboardFundedPage() {
   const [rows, setRows] = useState<IFundedLeaderboardUser[]>([])
@@ -95,11 +26,7 @@ export default function LeaderboardFundedPage() {
     setLoading(true)
     setError(null)
     try {
-      const loader =
-        typeof getFundedLeaderboard === 'function'
-          ? getFundedLeaderboard
-          : getFundedLeaderboardFallback
-      const response = await loader(page, ITEMS_PER_LOAD)
+      const response = await getFundedLeaderboard(page, ITEMS_PER_LOAD)
       const { users, pagination } = response.data.data
       if (append) {
         setRows(prev => [...prev, ...users])
@@ -130,50 +57,59 @@ export default function LeaderboardFundedPage() {
   }, [])
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex min-h-screen flex-col gap-4 px-4 pb-28 pt-3">
+      <HubPageHeader title="Leaderboard" subtitle="Trees funded · MGRO burned" />
+
       <LeaderboardTopTabs />
+
       {loading && rows.length === 0 ? (
         <div className="flex h-32 items-center justify-center">
           <Spinner size="lg" />
         </div>
       ) : error ? (
-        <div className="py-8 text-center">
-          <p className="mb-4 text-red-500">{error}</p>
+        <div className="tg-pill-card-muted py-8 text-center">
+          <p className="mb-4 text-red-600">{error}</p>
           <Button color="gray" onClick={() => fetchFundedLeaderboard()}>
             Try Again
           </Button>
         </div>
       ) : rows.length > 0 ? (
         <>
-          <div className="flex flex-col gap-3">
+          <div className="tg-pill-card-muted p-4">
             {rows.map(row => (
-              <FundedTreesCard key={row._id} {...row} />
+              <LeaderboardItem
+                key={row._id}
+                variant="funded"
+                rank={row.rank}
+                walletAddress={row.walletAddress}
+                totalBurnedMgroWei={row.totalBurnedMgroWei}
+              />
             ))}
           </div>
           {totalPages > 1 && (
             <div className="mt-4 flex flex-col gap-4">
               {hasMore && (
                 <div className="flex justify-center">
-                  <Button
-                    color="gray"
-                    onClick={loadMore}
+                  <button
+                    type="button"
                     disabled={loading}
-                    className="min-w-[120px]"
+                    onClick={loadMore}
+                    className="tg-pill-row-btn min-w-[140px] justify-center font-black uppercase tracking-wide"
                   >
-                    {loading ? <Spinner size="sm" /> : 'Load More'}
-                  </Button>
+                    {loading ? <Spinner size="sm" /> : 'Load more'}
+                  </button>
                 </div>
               )}
-              <div className="text-center text-sm font-medium text-warm-grey-400">
+              <div className="text-center text-sm font-medium text-[#6b6560]">
                 Page {currentPage} of {totalPages}
-                {rows.length > 0 && <span> • Showing {rows.length} items</span>}
+                {rows.length > 0 && <span> · {rows.length} shown</span>}
               </div>
             </div>
           )}
         </>
       ) : (
-        <div className="py-8 text-center">
-          <p className="text-gray-500">No funded leaderboard data available</p>
+        <div className="tg-pill-card-muted py-8 text-center">
+          <p className="text-[#6b6560]">No funded leaderboard data available</p>
         </div>
       )}
     </div>

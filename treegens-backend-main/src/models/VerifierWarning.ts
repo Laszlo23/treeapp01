@@ -7,7 +7,6 @@ const verifierWarningSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     submissionId: {
       type: mongoose.Schema.Types.ObjectId,

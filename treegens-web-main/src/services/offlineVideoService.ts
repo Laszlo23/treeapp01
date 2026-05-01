@@ -139,7 +139,7 @@ export class OfflineVideoService {
         )
       }
 
-      await this.waitForActiveController(5000)
+      await this.waitForActiveController(8000)
 
       // Listen for messages from service worker
       nsw.addEventListener(
@@ -175,7 +175,7 @@ export class OfflineVideoService {
       console.log('[OfflineVideoService] Service Worker initialized')
       return registration
     } catch (error) {
-      console.error(
+      console.warn(
         '[OfflineVideoService] Service Worker registration failed:',
         error,
       )
@@ -441,7 +441,7 @@ export class OfflineVideoService {
         let controller = nsw.controller
         if (!controller) {
           try {
-            await this.waitForActiveController(5000)
+            await this.waitForActiveController(8000)
             controller = nsw.controller
           } catch {
             reject(new Error('No active service worker'))
@@ -460,7 +460,7 @@ export class OfflineVideoService {
   }
 
   private async waitForActiveController(
-    timeoutMs: number = 5000,
+    timeoutMs: number = 8000,
   ): Promise<void> {
     if (typeof window === 'undefined') return
     const nsw = navigator.serviceWorker
@@ -468,10 +468,10 @@ export class OfflineVideoService {
       throw new Error('Service workers not available')
     }
     if (nsw.controller) return
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>(resolve => {
       const timeout = setTimeout(() => {
         cleanup()
-        reject(new Error('Timed out waiting for service worker controller'))
+        resolve()
       }, timeoutMs)
 
       const onControllerChange = () => {
@@ -541,7 +541,7 @@ export class OfflineVideoService {
   private async sendBaseURLToServiceWorker(): Promise<void> {
     try {
       const baseURL =
-        process.env.NEXT_PUBLIC_API_URL || 'https://treegens-be.generalmagic.io'
+        process.env.NEXT_PUBLIC_API_URL || 'https://treegens.app'
       await this.sendMessageToServiceWorker('SET_BASE_URL', { baseURL })
     } catch (error) {
       console.log(

@@ -148,6 +148,9 @@ export default function CautionedSubmissionDetailPage() {
               plantVideoUrl={plantVideoUrl}
               locationText={locationText}
               timeAgo={plantVideoTimestamp}
+              aiVerification={group.aiVerification}
+              submissionTreesPlanted={group.submissionTreesPlanted}
+              submissionTreeSpecies={group.submissionTreeSpecies}
             />
           </div>
         ) : (

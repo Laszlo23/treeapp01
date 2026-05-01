@@ -8,7 +8,10 @@ import { swaggerSpec, swaggerUi, swaggerUiOptions } from './config/swagger'
 import errorHandler from './middleware/errorHandler'
 import { globalApiLimiter } from './middleware/rateLimits'
 import authRoutes from './routes/auth'
+import conversationsRoutes from './routes/conversations'
 import healthRoutes from './routes/health'
+import notificationsRoutes from './routes/notifications'
+import pushRoutes from './routes/push'
 import rewardsRoutes from './routes/rewards'
 import submissionsRoutes from './routes/submissions'
 import userRoutes from './routes/users'
@@ -40,6 +43,9 @@ app.use(
 app.use('/api/submissions', submissionsRoutes)
 app.use('/api/rewards', rewardsRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/notifications', notificationsRoutes)
+app.use('/api/push', pushRoutes)
+app.use('/api/conversations', conversationsRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/health', healthRoutes)
 
@@ -133,7 +139,7 @@ if (env.ENABLE_CRONJOBS === 'true') {
     )
   } catch {
     console.warn(
-      'VerifierService not initialized. Set BASE_SEPOLIA_RPC_URL to enable cron.',
+      'VerifierService not initialized. Set BASE_RPC_URL to enable cron.',
     )
   }
 }

@@ -56,3 +56,31 @@ export const rewardClaimLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
 })
+
+/** POST /api/users/me/social-rewards/tasks/:taskKey/complete */
+export const socialTaskCompleteLimiter = rateLimit({
+  ...defaults,
+  windowMs: 60 * 1000,
+  max: 20,
+})
+
+/** GET /api/notifications*, polling unread counts */
+export const notificationPollLimiter = rateLimit({
+  ...defaults,
+  windowMs: 60 * 1000,
+  max: 200,
+})
+
+/** POST /api/push/subscribe|unsubscribe */
+export const pushSubscribeLimiter = rateLimit({
+  ...defaults,
+  windowMs: 60 * 1000,
+  max: 30,
+})
+
+/** POST /api/submissions/:id/conversation/messages */
+export const conversationMessageLimiter = rateLimit({
+  ...defaults,
+  windowMs: 60 * 1000,
+  max: 60,
+})

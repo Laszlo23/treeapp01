@@ -41,22 +41,30 @@ class EnvironmentConfig {
     return this.NODE_ENV === 'production'
   }
 
-  // Optional chain config for verifier feature
-  get BASE_SEPOLIA_RPC_URL() {
-    return process.env.BASE_SEPOLIA_RPC_URL || process.env.RPC_URL
+  /**
+   * Base mainnet JSON-RPC URL for verifier reads, mint/slash workers, indexers.
+   * Legacy: `BASE_SEPOLIA_RPC_URL` still works if unset (migration from testnet).
+   */
+  get BASE_RPC_URL() {
+    return (
+      process.env.BASE_RPC_URL?.trim() ||
+      process.env.BASE_MAINNET_RPC_URL?.trim() ||
+      process.env.BASE_SEPOLIA_RPC_URL?.trim() ||
+      process.env.RPC_URL?.trim()
+    )
   }
 
   get TGN_VAULT_ADDRESS() {
     return (
       process.env.TGN_VAULT_ADDRESS ||
-      '0x66e003F3318F13b122477E2561c1cf5C5181bc97'
+      '0x64b05503c6F2233d279E6B8B8f2Da6936dEd584C'
     )
   }
 
   get TGN_TOKEN_ADDRESS() {
     return (
       process.env.TGN_TOKEN_ADDRESS ||
-      '0xA10336e3e0ee9CC81397db91aC585BA32460Cdcf'
+      '0xD75dfa972C6136f1c594Fec1945302f885E1ab29'
     )
   }
 
@@ -259,6 +267,27 @@ class EnvironmentConfig {
     return process.env.AI_API_SEND_SUBMISSION_METADATA !== 'false'
   }
 
+  /**
+   * Ultralytics `/predict` on Cloud Run is typically image-based (multipart `file` + conf/iou/imgsz).
+   * `middle_frame_jpeg` decodes the planter clip (MP4, WebM from MediaRecorder, etc.), grabs the
+   * midpoint frame, and sends `image/jpeg` — same contract as `curl -F file=@image.jpg`.
+   * `multipart_video` sends the raw upload bytes (only if your endpoint accepts video).
+   */
+  get AI_ULTRALYTICS_INPUT_MODE(): 'multipart_video' | 'middle_frame_jpeg' {
+    const v = (process.env.AI_ULTRALYTICS_INPUT_MODE || 'middle_frame_jpeg')
+      .trim()
+      .toLowerCase()
+    if (
+      v === 'multipart_video' ||
+      v === 'video' ||
+      v === 'raw' ||
+      v === 'raw_video'
+    ) {
+      return 'multipart_video'
+    }
+    return 'middle_frame_jpeg'
+  }
+
   /** Optional multipart fields for Ultralytics-style predict (omit when unset). */
   get AI_PREDICT_CONF() {
     return (process.env.AI_PREDICT_CONF || '').trim()
@@ -293,7 +322,7 @@ class EnvironmentConfig {
   /** Comma-separated paths to try for integer count (e.g. `count,data.count`). */
   get AI_RESPONSE_COUNT_PATHS() {
     const def =
-      'mangrove_count,count,outputs.mangrove_count,outputs.0.mangrove_count,data.count,data.mangrove_count,result.mangrove_count,data.detected,data.detected_count,result.count,treesCount,mangroveCount,mangrovesCounted,detected,totalDetections'
+      'mangrove_count,seedling_count,count,outputs.mangrove_count,outputs.0.mangrove_count,verification_json.mangrove_count,verification_json.seedling_count,verification_json.count,outputs.verification_json.mangrove_count,outputs.verification_json.count,data.count,data.mangrove_count,result.mangrove_count,data.detected,data.detected_count,result.count,treesCount,mangroveCount,mangrovesCounted,detected,totalDetections'
     return (process.env.AI_RESPONSE_COUNT_PATHS || def)
       .split(',')
       .map(s => s.trim())
@@ -303,7 +332,7 @@ class EnvironmentConfig {
   /** Comma-separated paths to try for confidence in 0–1 or 0–100. */
   get AI_RESPONSE_CONFIDENCE_PATHS() {
     const def =
-      'confidence,data.confidence,score,data.score,data.confidence_score,overallConfidence'
+      'confidence,average_confidence,verification_json.confidence,data.confidence,verification_json.average_confidence,data.average_confidence,score,data.score,data.confidence_score,overallConfidence'
     return (process.env.AI_RESPONSE_CONFIDENCE_PATHS || def)
       .split(',')
       .map(s => s.trim())
@@ -411,6 +440,103 @@ class EnvironmentConfig {
    */
   get AI_ROBOFLOW_MINIMAL_REQUEST() {
     return process.env.AI_ROBOFLOW_MINIMAL_REQUEST === 'true'
+  }
+
+  /** Used by Swagger `/docs` server entry. */
+  get API_BASE_URL() {
+    return (process.env.API_BASE_URL || 'http://localhost:3000').trim()
+  }
+
+  get JWT_SECRET() {
+    return (process.env.JWT_SECRET || '').trim()
+  }
+
+  get JWT_EXPIRES_IN() {
+    return (process.env.JWT_EXPIRES_IN || '7d').trim()
+  }
+
+  /** Publishable Infer / Roboflow key (browser); backend inference uses `ROBOFLOW_API_KEY`. */
+  get ROBOFLOW_PUBLIC_API_KEY() {
+    return String(process.env.ROBOFLOW_PUBLIC_API_KEY || '').trim()
+  }
+
+  get THIRDWEB_SECRET_KEY() {
+    return String(process.env.THIRDWEB_SECRET_KEY || '').trim()
+  }
+
+  get THIRDWEB_PROJECT_ID() {
+    return String(process.env.THIRDWEB_PROJECT_ID || '').trim()
+  }
+
+  get TELEGRAM_BOT_TOKEN() {
+    return String(process.env.TELEGRAM_BOT_TOKEN || '').trim()
+  }
+
+  get X_CLIENT_ID() {
+    return String(process.env.X_CLIENT_ID || '').trim()
+  }
+
+  get X_CLIENT_SECRET() {
+    return String(process.env.X_CLIENT_SECRET || '').trim()
+  }
+
+  get NEYNAR_API_KEY() {
+    return String(process.env.NEYNAR_API_KEY || '').trim()
+  }
+
+  get LANGBASE_API_KEY() {
+    return String(process.env.LANGBASE_API_KEY || '').trim()
+  }
+
+  get LLM_API_KEY() {
+    return String(process.env.LLM_API_KEY || '').trim()
+  }
+
+  /** Ops / deploy hints (not routed). */
+  get VPS_IP() {
+    return String(process.env.VPS_IP || '').trim()
+  }
+
+  get VPS_USERNAME() {
+    return String(process.env.VPS_USERNAME || '').trim()
+  }
+
+  get BACKEND_URL() {
+    return String(process.env.BACKEND_URL || '')
+      .trim()
+      .replace(/\/+$/, '')
+  }
+
+  get DOCKER_IMAGE() {
+    return String(process.env.DOCKER_IMAGE || '').trim()
+  }
+
+  get VAPID_PUBLIC_KEY() {
+    return String(process.env.VAPID_PUBLIC_KEY || '').trim()
+  }
+
+  get VAPID_PRIVATE_KEY() {
+    return String(process.env.VAPID_PRIVATE_KEY || '').trim()
+  }
+
+  get VAPID_CONTACT_EMAIL() {
+    return (
+      String(process.env.VAPID_CONTACT_EMAIL || '').trim() ||
+      'mailto:team@treegens.app'
+    )
+  }
+
+  /**
+   * When true, POST /api/users/me/delegate requires min on-chain staked TGN (same bar as verifiers).
+   * Default false so off-chain delegation works without RPC/vault reads (common in dev / wallets without stake).
+   */
+  get DELEGATION_REQUIRE_MIN_STAKED_TGN() {
+    return process.env.DELEGATION_REQUIRE_MIN_STAKED_TGN === 'true'
+  }
+
+  /** Dev/demo: return seeded leaderboard rows when DB has no entries (never in production). */
+  get LEADERBOARD_DEMO_FALLBACK() {
+    return process.env.LEADERBOARD_DEMO_FALLBACK === 'true'
   }
 
   validateRequired() {

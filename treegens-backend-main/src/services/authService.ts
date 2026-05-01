@@ -1,5 +1,6 @@
 import { ethers } from 'ethers'
 import jwt from 'jsonwebtoken'
+import env from '../config/environment'
 import AuthChallenge from '../models/AuthChallenge'
 import User from '../models/User'
 
@@ -15,8 +16,8 @@ class AuthService {
   private challengeExpiry: number
   constructor() {
     this.jwtSecret =
-      process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-    this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d'
+      env.JWT_SECRET || 'your-secret-key-change-in-production'
+    this.jwtExpiresIn = env.JWT_EXPIRES_IN || '7d'
     this.challengeExpiry = 10 * 60 * 1000 // 10 minutes
   }
 

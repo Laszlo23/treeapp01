@@ -18,6 +18,7 @@ const voteSchema = new mongoose.Schema(
     },
     vote: { type: String, enum: ['yes', 'no'], required: true },
     reasons: { type: [String], default: [] },
+    delegatedFor: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now },
   },
   { _id: false },

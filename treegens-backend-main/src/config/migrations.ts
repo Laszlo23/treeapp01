@@ -1,5 +1,10 @@
 import mongoose from 'mongoose'
 
+import {
+  SOCIAL_TASK_CATALOG,
+  SOCIAL_TASK_KEYS,
+} from '../constants/socialRewardsCatalog'
+
 // Migration tracking schema
 const migrationSchema = new mongoose.Schema({
   version: { type: String, required: true, unique: true },
@@ -875,6 +880,215 @@ const migrations = [
     },
     down: async () => {
       console.log('Migration 2.7.0 down is a no-op')
+    },
+  },
+  {
+    version: '2.8.0',
+    description:
+      'Seed socialrewardtasks collection from SOCIAL_TASK_CATALOG (quest copy + ordering in MongoDB)',
+    up: async () => {
+      const db = mongoose.connection.db
+      const coll = db.collection('socialrewardtasks')
+      const indexes = await coll.indexes().catch(() => [] as { key?: Record<string, number> }[])
+      const hasTaskKeyUnique = indexes.some(
+        idx =>
+          idx.key &&
+          Object.keys(idx.key).length === 1 &&
+          idx.key!.taskKey === 1,
+      )
+      if (!hasTaskKeyUnique) {
+        try {
+          await coll.createIndex({ taskKey: 1 }, { unique: true })
+          console.log('socialrewardtasks taskKey unique index created')
+        } catch (e: unknown) {
+          console.log(
+            'socialrewardtasks taskKey index:',
+            e instanceof Error ? e.message : e,
+          )
+        }
+      }
+
+      for (let i = 0; i < SOCIAL_TASK_KEYS.length; i++) {
+        const taskKey = SOCIAL_TASK_KEYS[i]
+        const entry = SOCIAL_TASK_CATALOG[taskKey]
+        await coll.updateOne(
+          { taskKey },
+          {
+            $set: {
+              taskKey,
+              title: entry.title,
+              description: entry.description,
+              points: entry.points,
+              sortOrder: i,
+              active: true,
+              updatedAt: new Date(),
+            },
+            $setOnInsert: { createdAt: new Date() },
+          },
+          { upsert: true },
+        )
+      }
+      console.log(
+        `socialrewardtasks seeded (${SOCIAL_TASK_KEYS.length} tasks)`,
+      )
+    },
+    down: async () => {
+      const db = mongoose.connection.db
+      try {
+        await db.collection('socialrewardtasks').drop()
+        console.log('socialrewardtasks collection dropped')
+      } catch {
+        console.log('socialrewardtasks drop skipped')
+      }
+    },
+  },
+  {
+    version: '2.9.0',
+    description:
+      'Audit: dailycheckins + socialtaskcompletions indexes; backfill from users.completedSocialTasks and lastCheckinAt',
+    up: async () => {
+      const db = mongoose.connection.db
+      const daily = db.collection('dailycheckins')
+      const social = db.collection('socialtaskcompletions')
+
+      try {
+        await daily.createIndex(
+          { walletAddress: 1, utcDay: 1 },
+          { unique: true },
+        )
+        console.log('dailycheckins compound unique index ensured')
+      } catch (e: unknown) {
+        console.log(
+          'dailycheckins index:',
+          e instanceof Error ? e.message : e,
+        )
+      }
+
+      try {
+        await social.createIndex(
+          { walletAddress: 1, taskKey: 1 },
+          { unique: true },
+        )
+        console.log('socialtaskcompletions compound unique index ensured')
+      } catch (e: unknown) {
+        console.log(
+          'socialtaskcompletions index:',
+          e instanceof Error ? e.message : e,
+        )
+      }
+
+      const catalogKeys = new Set(Object.keys(SOCIAL_TASK_CATALOG))
+      const users = db.collection('users')
+      const cursor = users.find({
+        $or: [
+          { 'completedSocialTasks.0': { $exists: true } },
+          { lastCheckinAt: { $exists: true, $ne: null } },
+        ],
+      })
+
+      let socialUpserts = 0
+      let dailyUpserts = 0
+
+      for await (const u of cursor) {
+        const waRaw = u.walletAddress
+        const wa =
+          typeof waRaw === 'string' ? waRaw.toLowerCase().trim() : ''
+        if (!wa) continue
+
+        const tasks = (u.completedSocialTasks ?? []) as Array<{
+          taskKey: string
+          completedAt?: Date
+        }>
+
+        for (const t of tasks) {
+          if (!t?.taskKey || !catalogKeys.has(t.taskKey)) continue
+          if (t.taskKey === 'daily_checkin') continue
+
+          const pts =
+            SOCIAL_TASK_CATALOG[
+              t.taskKey as keyof typeof SOCIAL_TASK_CATALOG
+            ].points
+
+          try {
+            const res = await social.updateOne(
+              { walletAddress: wa, taskKey: t.taskKey },
+              {
+                $setOnInsert: {
+                  walletAddress: wa,
+                  taskKey: t.taskKey,
+                  pointsEarned: pts,
+                  createdAt: t.completedAt
+                    ? new Date(t.completedAt)
+                    : new Date(),
+                  updatedAt: new Date(),
+                },
+              },
+              { upsert: true },
+            )
+            if (
+              res.upsertedCount ||
+              (res as { upsertedId?: unknown }).upsertedId
+            ) {
+              socialUpserts += 1
+            }
+          } catch (e: unknown) {
+            console.log(
+              'socialtaskcompletions backfill row:',
+              e instanceof Error ? e.message : e,
+            )
+          }
+        }
+
+        if (u.lastCheckinAt) {
+          const utcDay = new Date(u.lastCheckinAt).toISOString().slice(0, 10)
+          const pts = SOCIAL_TASK_CATALOG.daily_checkin.points
+          try {
+            const res = await daily.updateOne(
+              { walletAddress: wa, utcDay },
+              {
+                $setOnInsert: {
+                  walletAddress: wa,
+                  utcDay,
+                  pointsEarned: pts,
+                  createdAt: new Date(u.lastCheckinAt),
+                  updatedAt: new Date(),
+                },
+              },
+              { upsert: true },
+            )
+            if (
+              res.upsertedCount ||
+              (res as { upsertedId?: unknown }).upsertedId
+            ) {
+              dailyUpserts += 1
+            }
+          } catch (e: unknown) {
+            console.log(
+              'dailycheckins backfill row:',
+              e instanceof Error ? e.message : e,
+            )
+          }
+        }
+      }
+
+      console.log(
+        `Migration 2.9.0 backfill upserts: socialtaskcompletions≈${socialUpserts} dailycheckins≈${dailyUpserts}`,
+      )
+    },
+    down: async () => {
+      const db = mongoose.connection.db
+      try {
+        await db.collection('dailycheckins').drop()
+        console.log('dailycheckins collection dropped')
+      } catch {
+        console.log('dailycheckins drop skipped')
+      }
+      try {
+        await db.collection('socialtaskcompletions').drop()
+        console.log('socialtaskcompletions collection dropped')
+      } catch {
+        console.log('socialtaskcompletions drop skipped')
+      }
     },
   },
 ]

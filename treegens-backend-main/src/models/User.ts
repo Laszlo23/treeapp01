@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
-      index: true,
     },
     name: {
       type: String,
@@ -96,14 +95,41 @@ const userSchema = new mongoose.Schema(
       type: Date,
       required: false,
     },
+    /** Loyalty points for social tasks; convertible to TGN distributions off-chain/on-chain elsewhere */
+    socialPointsTotal: {
+      type: Number,
+      required: false,
+      default: 0,
+      min: 0,
+    },
+    completedSocialTasks: [
+      {
+        taskKey: { type: String, required: true, trim: true },
+        completedAt: { type: Date, required: true },
+      },
+    ],
+    /** UTC instant of last `daily_checkin` completion (repeatable once per UTC day). */
+    lastCheckinAt: {
+      type: Date,
+      required: false,
+    },
+    /** Off-chain stake delegation: verifier wallet receiving proxy vote credit from this user. */
+    verifierDelegate: {
+      type: String,
+      lowercase: true,
+      default: null,
+      index: true,
+    },
+    verifierDelegateSetAt: {
+      type: Date,
+      required: false,
+    },
   },
   {
     timestamps: true,
   },
 )
 
-// Indexes for efficient querying
-userSchema.index({ walletAddress: 1 })
 userSchema.index({ createdAt: -1 })
 
 export default mongoose.model('User', userSchema)

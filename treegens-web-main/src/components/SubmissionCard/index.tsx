@@ -43,20 +43,12 @@ export default function SubmissionCard({
 
   const ipfsVideoUrl = ipfsGatewayUrl(video.videoCID) ?? ''
 
-  const showTrees =
-    video.type === VideoType.PLANT &&
-    (video.treesPlanted != null ||
-      (video.treetype && video.treetype.trim() !== ''))
-
-  const treesText = (() => {
-    if (!showTrees) return ''
-    const count =
-      video.treesPlanted != null && video.treesPlanted > 0
-        ? formatTreeCount(video.treesPlanted)
-        : ''
-    const type = video.treetype?.trim() || ''
-    return [count, type].filter(Boolean).join(' ')
-  })()
+  const isPlantClip = video.type === VideoType.PLANT
+  const treeCountDisplay =
+    video.treesPlanted != null && Number.isFinite(Number(video.treesPlanted))
+      ? formatTreeCount(Math.max(0, Math.floor(Number(video.treesPlanted))))
+      : null
+  const speciesLabel = video.treetype?.trim() || ''
 
   const locationText =
     video.reverseGeocode ||
@@ -92,15 +84,36 @@ export default function SubmissionCard({
             Your browser does not support the video tag.
           </video>
 
-          {showTrees && treesText ? (
-            <div className="pointer-events-none absolute right-2 top-2 z-[3] flex max-w-[min(92%,280px)] flex-row items-center gap-1.5 rounded-full bg-black/50 px-2 py-1.5">
-              <Image src="/img/tree.svg" alt="" width={14} height={14} />
-              <span
-                className="truncate text-xs font-semibold capitalize text-white"
-                title={treesText}
-              >
-                {treesText}
-              </span>
+          {isPlantClip ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] flex flex-col bg-gradient-to-t from-black/92 via-black/55 to-transparent px-3 pb-3 pt-14">
+              <div className="flex items-center gap-1.5">
+                <Image src="/img/tree.svg" alt="" width={16} height={16} />
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200/95">
+                  {speciesLabel.toLowerCase() === 'mangrove'
+                    ? 'Mangroves declared'
+                    : 'Trees planted'}
+                </span>
+              </div>
+              <p className="mt-1 text-lg font-black tabular-nums leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]">
+                {treeCountDisplay != null ? (
+                  <>
+                    {treeCountDisplay}
+                    {speciesLabel ? (
+                      <span className="ml-1.5 text-sm font-bold capitalize text-emerald-100/95">
+                        {speciesLabel}
+                      </span>
+                    ) : (
+                      <span className="ml-1.5 text-sm font-semibold text-emerald-100/95">
+                        trees
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-sm font-semibold text-emerald-100/90">
+                    {speciesLabel || 'Open submission for count'}
+                  </span>
+                )}
+              </p>
             </div>
           ) : null}
 

@@ -1,9 +1,10 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { HiOutlineVideoCamera } from 'react-icons/hi'
 import type { ISubmissionAiVerification, IVideo } from '@/types'
+import { AiVerdictCard } from '@/components/submission-detail/AiVerdictCard'
+import { PlantingCountCard } from '@/components/submission-detail/PlantingCountCard'
 
 type Props = {
   submissionId: string
@@ -12,6 +13,9 @@ type Props = {
   locationText: string
   timeAgo: string
   aiVerification?: ISubmissionAiVerification
+  /** Submission document fallbacks (`treesPlanted` / species on Mongo submission). */
+  submissionTreesPlanted?: number
+  submissionTreeSpecies?: string
 }
 
 export function PlantVideoSection({
@@ -21,24 +25,23 @@ export function PlantVideoSection({
   locationText,
   timeAgo,
   aiVerification,
+  submissionTreesPlanted,
+  submissionTreeSpecies,
 }: Props) {
   const completeHref = `/submissions/create/${encodeURIComponent(submissionId)}`
 
+  const declared =
+    typeof plantVideo?.treesPlanted === 'number'
+      ? plantVideo.treesPlanted
+      : submissionTreesPlanted
+
+  const species =
+    plantVideo?.treetype?.trim() || submissionTreeSpecies?.trim() || null
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <div className="flex flex-row items-center justify-between gap-1">
         <h2 className="text-lg font-bold text-gray-900">Plant</h2>
-        {plantVideo ? (
-          <div className="flex flex-row items-center gap-1">
-            <Image src="/img/tree.svg" alt="" width={14} height={14} />
-            <span className="text-sm font-semibold capitalize text-gray-800">
-              {plantVideo.treesPlanted}
-              {plantVideo.treetype?.trim()
-                ? ` ${plantVideo.treetype.trim()}`
-                : ''}
-            </span>
-          </div>
-        ) : null}
       </div>
       {!plantVideo ? (
         <div className="flex flex-col items-center">
@@ -54,7 +57,12 @@ export function PlantVideoSection({
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-2xl bg-[#f3f4f6]">
+          <PlantingCountCard
+            declaredTrees={declared ?? null}
+            species={species}
+            aiVerification={aiVerification}
+          />
+          <div className="overflow-hidden rounded-2xl bg-[#f3f4f6] ring-2 ring-black/[0.04]">
             {plantVideoUrl ? (
               <video
                 className="aspect-video w-full object-cover"
@@ -75,57 +83,13 @@ export function PlantVideoSection({
             <p className="max-w-[70%] text-sm text-[#5c534a]">{locationText}</p>
             <p className="shrink-0 text-sm text-[#8a8278]">{timeAgo}</p>
           </div>
-          {plantVideo?.treetype?.toLowerCase() === 'mangrove' &&
-          aiVerification ? (
-            <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">
-              <p className="font-semibold text-gray-900">AI verification</p>
-              <dl className="mt-1 space-y-0.5">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-[#8a8278]">Decision</dt>
-                  <dd className="font-medium capitalize">
-                    {aiVerification.decision?.replace(/_/g, ' ') ?? '—'}
-                  </dd>
-                </div>
-                {typeof aiVerification.countedMangroves === 'number' ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-[#8a8278]">AI count</dt>
-                    <dd className="font-medium">
-                      {aiVerification.countedMangroves}
-                    </dd>
-                  </div>
-                ) : null}
-                {typeof aiVerification.confidence === 'number' ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-[#8a8278]">Confidence</dt>
-                    <dd className="font-medium">
-                      {(aiVerification.confidence * 100).toFixed(0)}%
-                    </dd>
-                  </div>
-                ) : null}
-                {typeof aiVerification.declaredTreesPlanted === 'number' ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-[#8a8278]">Declared trees</dt>
-                    <dd className="font-medium">
-                      {aiVerification.declaredTreesPlanted}
-                    </dd>
-                  </div>
-                ) : null}
-                {aiVerification.verifiedAt ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-[#8a8278]">Verified at</dt>
-                    <dd className="font-medium tabular-nums">
-                      {new Date(aiVerification.verifiedAt).toLocaleString()}
-                    </dd>
-                  </div>
-                ) : null}
-                {aiVerification.status === 'failed' &&
-                aiVerification.error ? (
-                  <div className="mt-2 text-xs text-red-700">
-                    {aiVerification.error}
-                  </div>
-                ) : null}
-              </dl>
-            </div>
+          {species?.toLowerCase() === 'mangrove' && aiVerification ? (
+            <AiVerdictCard
+              aiVerification={aiVerification}
+              declaredTrees={
+                typeof declared === 'number' ? declared : plantVideo?.treesPlanted
+              }
+            />
           ) : null}
         </>
       )}

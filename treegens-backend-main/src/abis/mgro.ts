@@ -1,5 +1,5 @@
 /**
- * MGRO ABI (Base Sepolia deployment): minting uses mintTokens(receiver, amount).
+ * MGRO ABI (Base deployment): minting uses mintTokens(receiver, amount).
  */
 export const MGRO_ABI = [
   {

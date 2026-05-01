@@ -1,13 +1,23 @@
 import express, { Request, Response } from 'express'
 import { authenticate } from '../middleware/auth'
-import { verifierPublicLimiter } from '../middleware/rateLimits'
+import {
+  socialTaskCompleteLimiter,
+  verifierPublicLimiter,
+} from '../middleware/rateLimits'
+import { isSocialTaskKey } from '../constants/socialRewardsCatalog'
 import {
   validateChallengeRequest,
   validateUpdateProfile,
 } from '../middleware/validation'
+import env from '../config/environment'
 import UserService from '../services/userService'
 import VerifierService from '../services/verifierService'
-import { sendError, sendNotFound, sendSuccess } from '../utils/responseHelpers'
+import {
+  sendBadRequest,
+  sendError,
+  sendNotFound,
+  sendSuccess,
+} from '../utils/responseHelpers'
 
 const router = express.Router()
 const userService = new UserService()
@@ -157,6 +167,123 @@ router.get(
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
+// GET /api/users/me/social-rewards — points + catalog + completions
+router.get('/me/social-rewards', authenticate, async (req: Request, res: Response) => {
+  try {
+    const walletAddress = req.user.walletAddress
+    const summary = await userService.getSocialRewardsSummary(walletAddress)
+    if (!summary) return sendNotFound(res, 'User')
+    return sendSuccess(res, 'Social rewards retrieved', summary)
+  } catch (error: unknown) {
+    console.error('Error in social-rewards:', error)
+    return sendError(res, 'Failed to load social rewards')
+  }
+})
+
+// POST /api/users/me/social-rewards/tasks/:taskKey/complete
+router.post(
+  '/me/social-rewards/tasks/:taskKey/complete',
+  authenticate,
+  socialTaskCompleteLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const taskKeyParam = String(req.params.taskKey || '').trim()
+      if (!taskKeyParam || !isSocialTaskKey(taskKeyParam)) {
+        return sendBadRequest(res, 'Invalid task')
+      }
+
+      const result = await userService.completeSocialTask(
+        req.user.walletAddress,
+        taskKeyParam,
+      )
+      if (!result) return sendNotFound(res, 'User')
+
+      return sendSuccess(res, result.newlyCompleted ? 'Points awarded' : 'Already completed', {
+        newlyCompleted: result.newlyCompleted,
+        pointsEarned: result.pointsEarned,
+        pointsTotal:
+          typeof (result.user as { socialPointsTotal?: number }).socialPointsTotal ===
+          'number'
+            ? (result.user as { socialPointsTotal: number }).socialPointsTotal
+            : 0,
+      })
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === 'INVALID_TASK') {
+        return sendBadRequest(res, 'Invalid task')
+      }
+      console.error('Error completing social task:', error)
+      return sendError(res, 'Failed to complete task')
+    }
+  },
+)
+
+router.post(
+  '/me/delegate',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const target = String(req.body?.walletAddress || '').trim()
+      if (!target) return sendBadRequest(res, 'walletAddress required')
+
+      if (env.DELEGATION_REQUIRE_MIN_STAKED_TGN) {
+        let eligible = false
+        try {
+          const stake = await verifierService.isEligibleByWallet(
+            req.user.walletAddress,
+          )
+          eligible = stake.eligible
+        } catch {
+          return sendError(res, 'Stake check unavailable', 503)
+        }
+        if (!eligible) {
+          return sendBadRequest(
+            res,
+            'You must meet the minimum staked TGN requirement to delegate',
+          )
+        }
+      }
+
+      const user = await userService.setVerifierDelegate(
+        req.user.walletAddress,
+        target,
+      )
+      if (!user) return sendNotFound(res, 'User')
+      return sendSuccess(res, 'Delegation updated', user)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : ''
+      if (msg === 'TARGET_NOT_VERIFIER') {
+        return sendBadRequest(res, 'Target wallet is not a verifier')
+      }
+      if (msg === 'CANNOT_DELEGATE_SELF') {
+        return sendBadRequest(res, 'Cannot delegate to yourself')
+      }
+      console.error('delegate error:', error)
+      return sendError(res, 'Failed to set delegate')
+    }
+  },
+)
+
+router.delete('/me/delegate', authenticate, async (req: Request, res: Response) => {
+  try {
+    await userService.clearVerifierDelegate(req.user.walletAddress)
+    const user = await userService.getUserByWalletAddress(req.user.walletAddress)
+    return sendSuccess(res, 'Delegation cleared', user)
+  } catch (error: unknown) {
+    console.error('delegate clear error:', error)
+    return sendError(res, 'Failed to clear delegate')
+  }
+})
+
+router.get('/me/delegators', authenticate, async (req: Request, res: Response) => {
+  try {
+    const rows = await userService.listDelegatorsForVerifier(req.user.walletAddress)
+    return sendSuccess(res, 'Delegators', { delegators: rows })
+  } catch (error: unknown) {
+    console.error('delegators list error:', error)
+    return sendError(res, 'Failed to load delegators')
+  }
+})
+
 router.patch(
   '/me',
   authenticate,
@@ -332,6 +459,25 @@ router.get('/leaderboard/trees-funded', async (req: Request, res: Response) => {
     return sendError(res, 'Failed to retrieve trees funded leaderboard')
   }
 })
+
+// GET /api/users/:walletAddress/public — public profile (no auth)
+router.get(
+  '/:walletAddress/public',
+  async (req: Request, res: Response) => {
+    try {
+      const raw = String(req.params.walletAddress || '').trim()
+      if (!/^0x[a-fA-F0-9]{40}$/.test(raw)) {
+        return sendBadRequest(res, 'Invalid wallet address')
+      }
+      const profile = await userService.getPublicProfile(raw)
+      if (!profile) return sendNotFound(res, 'User')
+      return sendSuccess(res, 'Public profile', profile)
+    } catch (error: unknown) {
+      console.error('public profile error:', error)
+      return sendError(res, 'Failed to load public profile')
+    }
+  },
+)
 
 /**
  * @swagger

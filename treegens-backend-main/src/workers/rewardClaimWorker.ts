@@ -8,6 +8,7 @@ import {
   RewardClaimJobPayload,
   getRewardClaimRedisOptions,
 } from '../queues/rewardClaimQueue'
+import { enqueueNotification } from '../services/notificationService'
 import RewardService from '../services/rewardService'
 
 const rewardService = new RewardService()
@@ -59,6 +60,15 @@ async function processClaimJob(job: Job<RewardClaimJobPayload>) {
         },
       },
     )
+
+    await enqueueNotification({
+      recipientWalletAddress: walletAddress.toLowerCase(),
+      kind: 'reward_ready',
+      title: 'Rewards processed',
+      body: 'Your TreeGens on-chain reward claim finished.',
+      link: `/submissions/${submissionId}`,
+      payload: { submissionId, jobId },
+    }).catch(() => {})
   } catch (error: any) {
     const message = error?.message || String(error)
     await RewardClaimJob.updateOne(

@@ -3,7 +3,7 @@
  * Handles offline video upload queue and background sync
  */
 
-const SW_VERSION = 'v1.266'
+const SW_VERSION = 'v1.267'
 const STATIC_CACHE = `treegens-static-${SW_VERSION}` // bump to refresh HTML/images
 const RUNTIME_CACHE = `treegens-runtime-${SW_VERSION}` // keep stable for Next build assets
 const FF_CACHE = 'treegens-ffmpeg-core' // dedicated, never-versioned cache for ffmpeg core
@@ -11,7 +11,7 @@ const UPLOAD_QUEUE_DB = 'treegens-upload-queue'
 const UPLOAD_STORE = 'pending-uploads'
 const SETTINGS_STORE = 'app-settings'
 
-// Enhanced logging system that forwards logs to main thread for Eruda visibility
+// Service worker logging: optionally forward logs to clients (main thread)
 const originalConsole = {
   log: console.log,
   error: console.error,
@@ -76,6 +76,8 @@ const STATIC_ASSETS = [
   '/leaderboard',
   '/leaderboard/funded',
   '/submissions',
+  '/earn',
+  '/inbox',
   '/submissions/create',
   '/manifest.json',
   '/img/treegens-logo.svg',
@@ -874,5 +876,59 @@ async function notifyClients(type, data) {
     })
   }
 }
+
+// Web Push (TreeGens inbox / alerts)
+self.addEventListener('push', event => {
+  let payload = {
+    title: 'TreeGens',
+    body: 'You have a new notification.',
+    url: '/inbox',
+  }
+  try {
+    const txt = event.data?.text?.()
+    if (txt) {
+      const parsed = JSON.parse(txt)
+      payload = { ...payload, ...parsed }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'TreeGens', {
+      body: payload.body || '',
+      icon: '/img/tree.svg',
+      badge: '/img/tree.svg',
+      data: { url: payload.url || '/inbox' },
+      vibrate: [160, 80, 160],
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const rawUrl = event.notification?.data?.url || '/inbox'
+  const targetUrl = new URL(rawUrl, self.location.origin).href
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          client.focus()
+          if ('navigate' in client && typeof client.navigate === 'function') {
+            try {
+              client.navigate(targetUrl)
+            } catch (_) {
+              /* navigate may throw if unsupported */
+            }
+          }
+          return
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl)
+      return undefined
+    }),
+  )
+})
 
 console.log('[SW] TreeGens Service Worker loaded')

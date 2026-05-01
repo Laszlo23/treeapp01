@@ -5,6 +5,20 @@ const nextConfig = {
   reactStrictMode: true,
   // Avoid inferring workspace root from a parent lockfile (e.g. ~/yarn.lock)
   outputFileTracingRoot: path.join(__dirname),
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'treegens.app',
+        pathname: '/**',
+      },
+    ],
+  },
   async redirects() {
     return [
       {

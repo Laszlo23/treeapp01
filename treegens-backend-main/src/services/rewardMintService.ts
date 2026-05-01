@@ -31,10 +31,10 @@ class RewardMintService {
     wallet: Wallet
     nonceManager: NonceManager
   } {
-    const rpcUrl = env.BASE_SEPOLIA_RPC_URL
+    const rpcUrl = env.BASE_RPC_URL
     if (!rpcUrl) {
       throw new Error(
-        'BASE_SEPOLIA_RPC_URL (or RPC_URL) is required for MGRO minting',
+        'BASE_RPC_URL (or RPC_URL) is required for MGRO minting',
       )
     }
     const pk = env.MGRO_MINTER_PRIVATE_KEY?.trim()
@@ -59,7 +59,7 @@ class RewardMintService {
 
   isConfigured(): boolean {
     return Boolean(
-      env.BASE_SEPOLIA_RPC_URL?.trim() && env.MGRO_MINTER_PRIVATE_KEY?.trim(),
+      env.BASE_RPC_URL?.trim() && env.MGRO_MINTER_PRIVATE_KEY?.trim(),
     )
   }
 

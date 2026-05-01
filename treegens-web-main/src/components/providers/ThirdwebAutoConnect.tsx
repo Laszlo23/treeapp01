@@ -2,7 +2,7 @@
 
 import { AutoConnect } from 'thirdweb/react'
 import { defaultChain } from '@/config/thirdwebChain'
-import { client } from '@/config/thirdwebConfig'
+import { client, getTreegensAppMetadata } from '@/config/thirdwebConfig'
 import { treegensWallets } from '@/config/treegensWallets'
 
 /**
@@ -14,6 +14,7 @@ export function ThirdwebAutoConnect() {
       client={client}
       chain={defaultChain}
       wallets={treegensWallets}
+      appMetadata={getTreegensAppMetadata()}
     />
   )
 }

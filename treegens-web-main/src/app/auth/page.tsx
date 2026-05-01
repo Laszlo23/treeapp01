@@ -1,9 +1,7 @@
 'use client'
 
 import { routes } from '@/config/appConfig'
-import { defaultChain } from '@/config/thirdwebChain'
-import { client } from '@/config/thirdwebConfig'
-import { treegensWallets } from '@/config/treegensWallets'
+import { getTreegensConnectModalProps } from '@/config/thirdwebConnect'
 import { useAuth } from '@/contexts/AuthProvider'
 import { offlineVideoService } from '@/services/offlineVideoService'
 import Image from 'next/image'
@@ -11,6 +9,40 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useActiveAccount, useConnectModal } from 'thirdweb/react'
 import toast from 'react-hot-toast'
+
+/** Forest canopy fallback when no env URL and `/public/img/treegens-bg.png` is missing. */
+const DEFAULT_AUTH_BG_REMOTE =
+  'https://images.unsplash.com/photo-1448375240586-882707dba888?auto=format&fit=crop&w=1920&q=80'
+
+function AuthBackdrop() {
+  const envSrc = process.env.NEXT_PUBLIC_AUTH_BG_URL?.trim()
+  const [src, setSrc] = useState(
+    () => envSrc || '/img/treegens-bg.png',
+  )
+
+  return (
+    <div className="absolute inset-0 -z-10">
+      <div
+        className="absolute inset-0 bg-gradient-to-b from-[#1a3012] via-[#243818] to-[#0d160a]"
+        aria-hidden
+      />
+      <Image
+        src={src}
+        alt=""
+        fill
+        className="object-cover"
+        sizes="100vw"
+        priority
+        onError={() => {
+          setSrc(prev =>
+            prev === DEFAULT_AUTH_BG_REMOTE ? prev : DEFAULT_AUTH_BG_REMOTE,
+          )
+        }}
+      />
+      <div className="absolute inset-0 bg-black/40" aria-hidden />
+    </div>
+  )
+}
 
 /**
  * Matches `mobile/app/auth.tsx`: one black “Sign in” opens the wallet flow,
@@ -107,15 +139,7 @@ export default function AuthPage() {
   const handleSignInPress = () => {
     if (pendingSignIn || isAuthenticating || isWalletConnecting) return
     setPendingSignIn(true)
-    openConnectModal({
-      client,
-      chain: defaultChain,
-      wallets: treegensWallets,
-      walletConnect: {
-        projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '',
-      },
-      showAllWallets: true,
-    }).catch(() => {
+    openConnectModal(getTreegensConnectModalProps()).catch(() => {
       setPendingSignIn(false)
     })
   }
@@ -139,9 +163,7 @@ export default function AuthPage() {
   if (isAuthenticating) {
     return (
       <div className="relative min-h-screen w-full">
-        <div className="absolute inset-0 -z-10">
-          <Image src="/img/treegens-bg.png" alt="" fill />
-        </div>
+        <AuthBackdrop />
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-lime-green-2" />
           <p className="text-center text-white">Signing you in…</p>
@@ -152,9 +174,7 @@ export default function AuthPage() {
 
   return (
     <main className="relative h-full w-full min-h-screen">
-      <div className="absolute inset-0 -z-10">
-        <Image src="/img/treegens-bg.png" alt="Background" fill />
-      </div>
+      <AuthBackdrop />
 
       <div className="flex min-h-screen flex-col justify-between px-5 pb-20 pt-[200px]">
         <div className="mx-auto flex flex-col items-center gap-2">

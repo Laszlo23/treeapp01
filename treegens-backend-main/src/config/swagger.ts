@@ -2,6 +2,8 @@ import path from 'path'
 import swaggerJsdoc from 'swagger-jsdoc'
 import swaggerUi from 'swagger-ui-express'
 
+import env from './environment'
+
 // Swagger definition
 const swaggerOptions = {
   definition: {
@@ -22,7 +24,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: process.env.API_BASE_URL || 'http://localhost:3000',
+        url: env.API_BASE_URL,
         description: 'Development server',
       },
       {
@@ -179,13 +181,18 @@ const swaggerOptions = {
         AiVerificationSnapshot: {
           type: 'object',
           description:
-            'Mangrove plant clip AI counting / confidence (Building Culture)',
+            'Mangrove plant clip AI counting / confidence (Ultralytics-style HTTP or Roboflow workflow)',
           properties: {
             status: {
               type: 'string',
               enum: ['skipped', 'processing', 'completed', 'failed'],
             },
-            provider: { type: 'string', example: 'buildingculture' },
+            provider: {
+              type: 'string',
+              example: 'ultralytics',
+              description:
+                'Snapshot label: ultralytics (multipart predict) or roboflow_workflow',
+            },
             countedMangroves: { type: 'number', minimum: 0 },
             confidence: { type: 'number', minimum: 0, maximum: 1 },
             verifiedAt: { type: 'string', format: 'date-time' },

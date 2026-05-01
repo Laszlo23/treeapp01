@@ -49,6 +49,52 @@ test('extractCountFromAiResponse finds count inside outputs[0]', () => {
   )
 })
 
+test('extractCountFromAiResponse reads Roboflow verification_json output', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      verification_json: { mangrove_count: 6 },
+    }),
+    6,
+  )
+  assert.equal(
+    extractCountFromAiResponse({
+      outputs: { verification_json: { count: 2 } },
+    }),
+    2,
+  )
+})
+
+test('extractCountFromAiResponse parses verification_json when emitted as JSON string', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      outputs: [
+        {
+          verification_json:
+            '{"seedling_count":3,"average_confidence":0.71,"status":"ok"}',
+        },
+      ],
+    }),
+    3,
+  )
+  assert.equal(
+    extractCountFromAiResponse({
+      verification_json:
+        '{"seedling_count":5,"average_confidence":0.8,"plant_type":"Rhizophora"}',
+    }),
+    5,
+  )
+})
+
+test('extractConfidenceFromAiResponse reads average_confidence inside stringified verification_json', () => {
+  assert.equal(
+    extractConfidenceFromAiResponse({
+      verification_json:
+        '{"seedling_count":1,"average_confidence":0.6635,"status":"ok"}',
+    }),
+    0.6635,
+  )
+})
+
 test('extractConfidenceFromAiResponse reads nested outputs', () => {
   assert.equal(
     extractConfidenceFromAiResponse({
@@ -145,6 +191,7 @@ test('verifyMangrovePlantVideo ultralytics posts multipart when configured', asy
     'AI_PREDICT_CONF',
     'AI_PREDICT_IOU',
     'AI_PREDICT_IMGSZ',
+    'AI_ULTRALYTICS_INPUT_MODE',
   ] as const
   const restore = keys.map(k => {
     const v = process.env[k]
@@ -160,6 +207,7 @@ test('verifyMangrovePlantVideo ultralytics posts multipart when configured', asy
   process.env.AI_API_PREDICT_URL = 'https://predict.example/run'
   delete process.env.AI_API_VERIFY_PATH
   process.env.AI_PREDICT_CONF = '0.25'
+  process.env.AI_ULTRALYTICS_INPUT_MODE = 'multipart_video'
 
   type PostFn = typeof axios.post
   const originalPost = axios.post

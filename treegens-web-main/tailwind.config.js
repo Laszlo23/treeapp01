@@ -54,6 +54,17 @@ module.exports = {
       boxShadow: {
         card: '0px 4px 20px 0px rgba(158, 167, 78, 0.30)',
       },
+      keyframes: {
+        'submission-complete-pop': {
+          '0%': { transform: 'scale(0.35)', opacity: '0' },
+          '70%': { transform: 'scale(1.06)', opacity: '1' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+      },
+      animation: {
+        'submission-complete-pop':
+          'submission-complete-pop 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) forwards',
+      },
     },
   },
 }

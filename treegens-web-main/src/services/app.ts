@@ -1,9 +1,12 @@
 import {
+  ICompleteSocialTaskEnvelope,
   IFundedLeaderboardResponse,
+  IPublicProfileEnvelope,
   IGetUserResponse,
   ILeaderboardResponse,
   IModerationListResponse,
   IMySubmissionsResponse,
+  ISocialRewardsEnvelope,
   ISubmissionDoc,
   IUserVideosResponse,
   IVerifierWarningBannerResponse,
@@ -35,6 +38,19 @@ export function patchCurrentUserProfile(body: {
   experience?: string
 }) {
   return axiosInstance.patch<IGetUserResponse>('/api/users/me', body)
+}
+
+export function getSocialRewardsSummary() {
+  return axiosInstance.get<ISocialRewardsEnvelope>(
+    '/api/users/me/social-rewards',
+  )
+}
+
+export function completeSocialRewardsTask(taskKey: string) {
+  return axiosInstance.post<ICompleteSocialTaskEnvelope>(
+    `/api/users/me/social-rewards/tasks/${encodeURIComponent(taskKey)}/complete`,
+    {},
+  )
 }
 
 /** Maps submission documents to legacy `IVideo[]` for existing UI. */
@@ -169,6 +185,13 @@ export async function getFundedLeaderboard(
       },
     },
   }
+}
+
+export function getPublicUser(walletAddress: string) {
+  const w = walletAddress.trim()
+  return axiosInstance.get<IPublicProfileEnvelope>(
+    `/api/users/${encodeURIComponent(w)}/public`,
+  )
 }
 
 // Moderation APIs (verifiers only) — uses submission moderation scope

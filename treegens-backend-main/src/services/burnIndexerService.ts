@@ -34,9 +34,9 @@ export default class BurnIndexerService {
   private syncInProgress = false
 
   constructor() {
-    const rpcUrl = env.BASE_SEPOLIA_RPC_URL
+    const rpcUrl = env.BASE_RPC_URL
     if (!rpcUrl) {
-      throw new Error('BASE_SEPOLIA_RPC_URL is required for burn indexer')
+      throw new Error('BASE_RPC_URL is required for burn indexer')
     }
     this.provider = new ethers.JsonRpcProvider(rpcUrl)
     this.contractAddress = env.MGRO_TOKEN_ADDRESS.toLowerCase()

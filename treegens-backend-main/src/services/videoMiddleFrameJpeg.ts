@@ -11,8 +11,32 @@ export type MiddleFrameJpegResult = {
   durationSeconds: number
 }
 
+/**
+ * FFmpeg probes format from content; suffix hints help demux quirks (especially WebM from browsers).
+ */
+export function tempVideoSuffixFromHints(
+  filename?: string,
+  contentType?: string,
+): string {
+  const fname = filename?.trim().toLowerCase() || ''
+  if (fname.endsWith('.webm')) return '.webm'
+  if (fname.endsWith('.mkv')) return '.mkv'
+  if (fname.endsWith('.mov')) return '.mov'
+  if (fname.endsWith('.m4v')) return '.m4v'
+  if (fname.endsWith('.mp4')) return '.mp4'
+
+  const ct = (contentType || '').toLowerCase()
+  if (ct.includes('webm')) return '.webm'
+  if (ct.includes('matroska')) return '.mkv'
+  if (ct.includes('quicktime')) return '.mov'
+  if (ct.includes('mp4')) return '.mp4'
+
+  return '.mp4'
+}
+
 export function extractMiddleFrameJpegFromMp4(
   videoBuffer: Buffer,
+  hints?: { filename?: string; contentType?: string },
 ): MiddleFrameJpegResult {
   if (!ffmpegPath) {
     throw new Error(
@@ -22,7 +46,8 @@ export function extractMiddleFrameJpegFromMp4(
 
   const dir = os.tmpdir()
   const id = randomUUID()
-  const inputPath = path.join(dir, `mangrove-ai-${id}.mp4`)
+  const suffix = tempVideoSuffixFromHints(hints?.filename, hints?.contentType)
+  const inputPath = path.join(dir, `mangrove-ai-${id}${suffix}`)
   const outputPath = path.join(dir, `mangrove-ai-${id}.jpg`)
 
   try {

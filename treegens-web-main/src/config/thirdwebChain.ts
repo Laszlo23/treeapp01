@@ -1,4 +1,4 @@
-import { baseSepolia } from 'thirdweb/chains'
+import { base } from 'thirdweb/chains'
 
-/** Default EVM chain for TreeGens web (connect modals, balances, txs). */
-export const defaultChain = baseSepolia
+/** Default EVM chain for TreeGens web — Base mainnet (chain id 8453). */
+export const defaultChain = base

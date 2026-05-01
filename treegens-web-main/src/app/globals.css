@@ -1,10 +1,274 @@
 /* Tailwind v4: @config MUST come before @import or the legacy config (theme, content) is ignored. */
 @config "../../tailwind.config.js";
 
-@import 'tailwindcss' source('..');
+/*
+ * Explicit scan paths: `@import ... source()` alone can miss classes in some Next.js
+ * layouts. Ensures utilities used in `src/components`, `src/app`, etc. always emit.
+ */
+@source "../**/*.{js,ts,jsx,tsx,mdx}";
+
+@import 'tailwindcss';
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /**
+   * Explicit shadows + borders so panels stay legible even if arbitrary Tailwind
+   * utilities fail to emit in some v4 builds.
+   */
+  .tg-card {
+    border-radius: 1.5rem;
+    border: 1px solid rgba(15, 22, 12, 0.08);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.85) inset,
+      0 14px 42px rgba(30, 15, 8, 0.1),
+      0 4px 12px rgba(67, 95, 36, 0.06);
+    backdrop-filter: blur(14px);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .tg-glass {
+    border-radius: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(28px);
+    box-shadow: 0 12px 40px rgba(30, 15, 8, 0.07);
+  }
+
+  /** Large glass panel (footers, rewards hero) */
+  .tg-glass-panel {
+    border-radius: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.48);
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.65) inset,
+      0 22px 56px rgba(30, 22, 12, 0.12);
+    backdrop-filter: blur(22px);
+  }
+
+  /** Metric / stat tiles — lifted “3D” cards */
+  .tg-impact-card {
+    position: relative;
+    border-radius: 1rem;
+    border: 1px solid rgba(223, 234, 138, 0.45);
+    background: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.97) 0%,
+      rgba(247, 250, 242, 0.88) 55%,
+      rgba(238, 246, 228, 0.72) 100%
+    );
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.95) inset,
+      0 18px 36px rgba(67, 95, 36, 0.14),
+      0 6px 16px rgba(30, 15, 8, 0.06);
+    transition: transform 0.2s ease;
+  }
+
+  .tg-impact-card-mgro {
+    border-radius: 1rem;
+    border: 1px solid rgba(107, 140, 59, 0.35);
+    background: linear-gradient(
+      125deg,
+      rgba(67, 95, 36, 0.12) 0%,
+      rgba(255, 255, 255, 0.55) 45%,
+      rgba(223, 234, 138, 0.28) 100%
+    );
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.7) inset,
+      0 20px 44px rgba(48, 62, 26, 0.18),
+      0 0 0 1px rgba(223, 234, 138, 0.25);
+    backdrop-filter: blur(12px);
+  }
+
+  .tg-modal-sheet {
+    border-radius: 1.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    background: linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fbfcf8 55%,
+      #f2f7eb 100%
+    );
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.95) inset,
+      0 32px 90px rgba(20, 28, 14, 0.38);
+  }
+
+  .tg-field {
+    @apply rounded-full border border-white/60 bg-white/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] backdrop-blur-md transition;
+  }
+
+  .tg-field:focus-within {
+    @apply border-[#435F24]/30 ring-2 ring-[#DFEA8A]/35;
+  }
+
+  .tg-page-bg {
+    background:
+      radial-gradient(
+        ellipse 130% 85% at 50% -14%,
+        rgba(223, 234, 138, 0.42),
+        transparent 55%
+      ),
+      linear-gradient(180deg, #faf9f6 0%, #eef4e8 100%);
+  }
+
+  .tg-cta {
+    @apply rounded-2xl bg-gradient-to-r from-[#b8cf56] to-[#6B8C3B] font-semibold text-[#16210c] shadow-[0_8px_28px_rgba(67,95,36,0.28)] transition-transform duration-200 active:scale-[0.98];
+  }
+
+  /**
+   * Footer “Connect & support” chip style — pure CSS so it survives if Tailwind
+   * utilities fail to generate for a route.
+   */
+  .tg-social-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.94);
+    padding: 0.4rem 0.75rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: #2d2419;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 6px 18px rgba(30, 22, 14, 0.1),
+      0 2px 5px rgba(30, 22, 14, 0.05);
+    backdrop-filter: blur(10px);
+    transition:
+      background 0.15s ease,
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .tg-social-pill:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 10px 26px rgba(30, 22, 14, 0.14),
+      0 3px 8px rgba(30, 22, 14, 0.07);
+  }
+
+  /**
+   * Larger “card” surfaces using the same elevated pill DNA (Earn tasks, DeFi).
+   */
+  .tg-pill-card {
+    border-radius: 1.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 1) inset,
+      0 14px 38px rgba(30, 22, 14, 0.11),
+      0 4px 12px rgba(48, 62, 26, 0.07);
+    backdrop-filter: blur(12px);
+  }
+
+  .tg-pill-card-muted {
+    border-radius: 1.35rem;
+    border: 1px solid rgba(223, 234, 138, 0.45);
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.85) inset,
+      0 12px 32px rgba(67, 95, 36, 0.1),
+      0 3px 10px rgba(30, 15, 8, 0.06);
+    backdrop-filter: blur(14px);
+  }
+
+  /** Full-width row actions inside task cards (matches footer pill lift). */
+  .tg-pill-row-btn {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(45, 36, 25, 0.11);
+    background: rgba(255, 255, 255, 0.99);
+    padding: 0.7rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a2610;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 6px 18px rgba(30, 22, 14, 0.09),
+      0 2px 5px rgba(30, 22, 14, 0.05);
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .tg-pill-row-btn:hover:not(:disabled) {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 10px 26px rgba(30, 22, 14, 0.12),
+      0 3px 8px rgba(30, 22, 14, 0.06);
+  }
+
+  .tg-pill-row-btn:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+
+  .tg-pill-row-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /** Full-width DeFi actions — pill silhouette like footer chips, stretched. */
+  .tg-pill-defi-action {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(45, 36, 25, 0.11);
+    background: rgba(255, 255, 255, 0.98);
+    padding: 0.9rem 1.15rem;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #1a2610;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 8px 22px rgba(30, 22, 14, 0.1),
+      0 2px 6px rgba(30, 22, 14, 0.05);
+    transition: transform 0.15s ease;
+    text-align: left;
+  }
+
+  .tg-pill-defi-action:active {
+    transform: scale(0.99);
+  }
+
+  .tg-pill-defi-action-stake {
+    border-radius: 9999px;
+    border: 1px solid rgba(48, 62, 26, 0.35);
+    background: linear-gradient(90deg, #435f24 0%, #303e1a 100%);
+    color: #fff;
+    box-shadow:
+      0 2px 0 rgba(255, 255, 255, 0.12) inset,
+      0 14px 36px rgba(48, 62, 26, 0.35);
+    padding: 0.9rem 1.15rem;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    transition: transform 0.15s ease;
+  }
+
+  .tg-pill-defi-action-stake:active {
+    transform: scale(0.99);
   }
 }

@@ -1,8 +1,10 @@
 export const Rectangle = () => (
   <svg
+    className="h-auto w-[min(100vw-1.5rem,420px)] max-w-none shrink-0"
     width="345"
     height="60"
     viewBox="0 0 345 60"
+    preserveAspectRatio="xMidYMid meet"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >

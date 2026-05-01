@@ -3,99 +3,32 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { HiArrowLeft, HiArrowPath } from 'react-icons/hi2'
+import { HiArrowLeft, HiArrowPath, HiLockClosed, HiUsers, HiWallet } from 'react-icons/hi2'
+import cn from 'classnames'
 import {
-  getContract,
   prepareContractCall,
   readContract,
   sendTransaction,
   waitForReceipt,
 } from 'thirdweb'
 import { defaultChain } from '@/config/thirdwebChain'
-import { useActiveAccount, useSwitchActiveWalletChain } from 'thirdweb/react'
-import type { Abi } from 'viem'
 import {
   TGN_TOKEN_ADDRESS as TOKEN_ADDRESS,
   TGN_TOKEN_DECIMALS as TOKEN_DECIMALS,
   TGN_VAULT_ADDRESS as VAULT_ADDRESS,
   VALIDATORS_MINIMUM_TGN_TOKENS,
 } from '@/config/tgnContracts'
-import { client } from '@/config/thirdwebConfig'
+import {
+  getTgnTokenContract,
+  getTgnVaultContract,
+} from '@/config/tgnThirdwebContracts'
+import { useActiveAccount, useSwitchActiveWalletChain } from 'thirdweb/react'
 import {
   checkVerifierStatus,
   getCurrentUser,
   requestVerifierStatus,
 } from '@/services/app'
-
-// Minimal ERC20 ABI
-const ERC20_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    name: 'allowance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    name: 'approve',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    name: 'symbol',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'string' }],
-  },
-  {
-    name: 'decimals',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint8' }],
-  },
-] as const satisfies Abi
-
-// Minimal TGNVault ABI parts we need
-const VAULT_ABI = [
-  {
-    name: 'stake',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'amount', type: 'uint256' }],
-    outputs: [],
-  },
-  {
-    name: 'unstake',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'amount', type: 'uint256' }],
-    outputs: [],
-  },
-  {
-    name: 'getStakedBalance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'staker', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-] as const satisfies Abi
+import { notifyError } from '@/utils/apiErrorMessage'
 
 function formatAmount(amount: bigint, decimals = TOKEN_DECIMALS): string {
   const negative = amount < 0n
@@ -135,24 +68,12 @@ export default function StakePage() {
   const switchChain = useSwitchActiveWalletChain()
   const [isVerifier, setIsVerifier] = useState<boolean>(false)
   const tokenContract = useMemo(
-    () =>
-      getContract({
-        client,
-        chain: defaultChain,
-        address: TOKEN_ADDRESS,
-        abi: ERC20_ABI,
-      }),
-    [],
+    () => getTgnTokenContract(),
+    [TOKEN_ADDRESS],
   )
   const vaultContract = useMemo(
-    () =>
-      getContract({
-        client,
-        chain: defaultChain,
-        address: VAULT_ADDRESS,
-        abi: VAULT_ABI,
-      }),
-    [],
+    () => getTgnVaultContract(),
+    [VAULT_ADDRESS],
   )
 
   const [symbol, setSymbol] = useState<string>('TGN')
@@ -168,7 +89,9 @@ export default function StakePage() {
     useState<boolean>(false)
   const [isSyncingBalances, setIsSyncingBalances] = useState<boolean>(false)
   const [allowanceWei, setAllowanceWei] = useState<bigint>(0n)
-  const [activeTab, setActiveTab] = useState<'stake' | 'unstake'>('stake')
+  const [activeTab, setActiveTab] = useState<'stake' | 'unstake' | 'delegate'>(
+    'stake',
+  )
 
   const MIN_VERIFIER_TOKENS = BigInt(Number(VALIDATORS_MINIMUM_TGN_TOKENS))
   const MIN_VERIFIER_WEI = MIN_VERIFIER_TOKENS * 10n ** BigInt(TOKEN_DECIMALS)
@@ -219,7 +142,7 @@ export default function StakePage() {
       await refreshAllowance()
     } catch (err) {
       console.error('Failed to load balances:', err)
-      toast.error('Failed to load balances')
+      notifyError('Failed to load balances')
     }
   }, [account?.address, tokenContract, vaultContract, refreshAllowance])
 
@@ -273,13 +196,13 @@ export default function StakePage() {
 
   const handleApprove = async () => {
     if (!account?.address) {
-      toast.error('Connect your wallet first')
+      notifyError('Connect your wallet first')
       return
     }
 
     const amountWei = parseAmount(inputAmount)
     if (amountWei === null || amountWei <= 0n) {
-      toast.error('Enter a valid amount')
+      notifyError('Enter a valid amount')
       return
     }
 
@@ -335,7 +258,7 @@ export default function StakePage() {
         typeof err === 'string'
           ? err
           : (err as Error)?.message || 'Approval failed'
-      toast.error(message)
+      notifyError(message)
     } finally {
       setIsApproving(false)
     }
@@ -343,13 +266,13 @@ export default function StakePage() {
 
   const handleStake = async () => {
     if (!account?.address) {
-      toast.error('Connect your wallet first')
+      notifyError('Connect your wallet first')
       return
     }
 
     const amountWei = parseAmount(inputAmount)
     if (amountWei === null || amountWei <= 0n) {
-      toast.error('Enter a valid amount')
+      notifyError('Enter a valid amount')
       return
     }
 
@@ -359,7 +282,7 @@ export default function StakePage() {
 
       const currentAllowance = await refreshAllowance()
       if (currentAllowance < amountWei) {
-        toast.error('Approval required before staking. Tap Approve first.')
+        notifyError('Approval required before staking. Tap Approve first.')
         return
       }
 
@@ -388,7 +311,7 @@ export default function StakePage() {
     } catch (err: unknown) {
       console.error('Stake failed:', err)
       const message = (err as Error)?.message || 'Transaction failed'
-      toast.error(message)
+      notifyError(message)
     } finally {
       setIsLoading(false)
     }
@@ -396,13 +319,13 @@ export default function StakePage() {
 
   const handleUnstake = async () => {
     if (!account?.address) {
-      toast.error('Connect your wallet first')
+      notifyError('Connect your wallet first')
       return
     }
 
     const amountWei = parseAmount(unstakeAmount)
     if (amountWei === null || amountWei <= 0n) {
-      toast.error('Enter a valid amount')
+      notifyError('Enter a valid amount')
       return
     }
 
@@ -443,7 +366,7 @@ export default function StakePage() {
     } catch (err: unknown) {
       console.error('Unstake failed:', err)
       const message = (err as Error)?.message || 'Transaction failed'
-      toast.error(message)
+      notifyError(message)
     } finally {
       setIsUnstaking(false)
     }
@@ -451,13 +374,13 @@ export default function StakePage() {
 
   const handleRequestVerifier = async () => {
     if (!account?.address) {
-      toast.error('Connect your wallet first')
+      notifyError('Connect your wallet first')
       return
     }
 
     // Check stake requirement on-chain first
     if (stakedBalanceWei < MIN_VERIFIER_WEI) {
-      toast.error(
+      notifyError(
         `You need at least ${VALIDATORS_MINIMUM_TGN_TOKENS} TGN staked to request verifier`,
       )
       return
@@ -478,7 +401,7 @@ export default function StakePage() {
     } catch (err: unknown) {
       console.error('Verifier request failed:', err)
       const message = (err as Error)?.message || 'Request failed'
-      toast.error(message)
+      notifyError(message)
     } finally {
       setIsRequestingVerifier(false)
     }
@@ -502,27 +425,34 @@ export default function StakePage() {
   const canUnstake = !!account?.address && !isActionLoading
 
   return (
-    <div className="relative min-h-screen flex-1 bg-white">
+    <div className="relative min-h-screen flex-1 pb-28">
       <div
-        className="pointer-events-none absolute bottom-0 left-0 right-0 -z-10 h-1/3 bg-[#E8F7ED]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_70%_at_50%_-8%,rgba(223,234,138,0.35),transparent_50%),linear-gradient(to_bottom,#faf9f6,#eef6e4_45%,#faf9f6)]"
         aria-hidden
       />
 
-      <header className="flex flex-row items-center justify-between border-b border-gray-100 px-4 py-2">
+      <header className="sticky top-0 z-10 flex flex-row items-center justify-between border-b border-white/50 bg-white/75 px-4 py-3 backdrop-blur-xl">
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-md p-0.5 text-[#111] hover:bg-gray-100"
+          className="rounded-xl p-2 text-[#111] transition hover:bg-black/[0.06] active:scale-95"
           aria-label="Back"
         >
           <HiArrowLeft className="h-6 w-6" />
         </button>
-        <h1 className="text-[22px] font-bold text-[#111]">Stake</h1>
+        <div className="text-center">
+          <h1 className="text-[20px] font-black tracking-tight text-[#142010]">
+            Stake
+          </h1>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#6b6560]">
+            TGN vault
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => void handleSyncBalances()}
           disabled={!account?.address || isSyncingBalances}
-          className="rounded-md p-0.5 text-[#111] hover:bg-gray-100 disabled:opacity-40"
+          className="rounded-xl p-2 text-[#111] transition hover:bg-black/[0.06] disabled:opacity-40 active:scale-95"
           aria-label="Refresh balances"
         >
           <HiArrowPath
@@ -531,157 +461,255 @@ export default function StakePage() {
         </button>
       </header>
 
-      <div className="px-5 pb-12 pt-4">
-        <div className="mb-4 flex flex-row gap-3">
-          <div className="flex-1 rounded-xl border border-gray-200 bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Balance</div>
-            <div className="mt-1 text-base font-semibold text-gray-900">
-              {tokenBalance} {symbol}
+      <div className="relative z-0 px-4 pb-14 pt-5">
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-600/35 via-[#6B8C3B]/25 to-lime-400/30 p-[1.5px] shadow-lg">
+            <div className="flex h-full flex-col rounded-[14px] bg-gradient-to-br from-white/95 to-emerald-50/50 px-4 py-4 backdrop-blur-md">
+              <div className="mb-3 flex items-center gap-2 text-emerald-950/85">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-inner ring-1 ring-emerald-200/60">
+                  <HiWallet className="h-5 w-5 text-emerald-900" />
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-[0.16em]">
+                  Wallet
+                </span>
+              </div>
+              <p className="text-xl font-black tabular-nums leading-tight tracking-tight text-[#0f160c]">
+                {tokenBalance}
+              </p>
+              <p className="mt-0.5 text-xs font-bold text-[#435F24]">{symbol}</p>
             </div>
           </div>
-          <div className="flex-1 rounded-xl border border-gray-200 bg-gray-50 p-3">
-            <div className="text-xs text-gray-500">Staked</div>
-            <div className="mt-1 text-base font-semibold text-gray-900">
-              {stakedBalance} {symbol}
+          <div className="rounded-2xl bg-gradient-to-br from-[#435F24]/55 via-[#DFEA8A]/35 to-amber-400/25 p-[1.5px] shadow-lg">
+            <div className="flex h-full flex-col rounded-[14px] bg-gradient-to-br from-white/95 to-[#f4f9ec]/70 px-4 py-4 backdrop-blur-md">
+              <div className="mb-3 flex items-center gap-2 text-[#2d4318]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#dfea8a] to-[#c5d46a] shadow-inner ring-1 ring-[#b8cf56]/60">
+                  <HiLockClosed className="h-5 w-5 text-[#303E1A]" />
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-[0.16em]">
+                  Staked
+                </span>
+              </div>
+              <p className="text-xl font-black tabular-nums leading-tight tracking-tight text-[#0f160c]">
+                {stakedBalance}
+              </p>
+              <p className="mt-0.5 text-xs font-bold text-[#435F24]">{symbol}</p>
             </div>
           </div>
         </div>
 
-        <div className="mb-4 flex justify-center">
-          <div className="flex flex-row rounded-full border border-gray-200 bg-gray-100 p-1">
+        <div className="mb-6 flex justify-center">
+          <div className="flex max-w-full flex-row gap-1 rounded-full border border-white/60 bg-white/50 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-md">
             <button
               type="button"
               onClick={() => setActiveTab('stake')}
-              className={`rounded-full px-7 py-2 text-base font-semibold transition-colors ${
-                isStakeTab
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500'
-              }`}
+              className={cn(
+                'rounded-full px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide transition sm:px-5 sm:text-sm',
+                activeTab === 'stake'
+                  ? 'bg-gradient-to-r from-[#dfea8a] to-[#b8cf56] text-[#1a2610] shadow-md ring-2 ring-white/80'
+                  : 'text-[#5c534a] hover:text-[#1a2610]',
+              )}
             >
               Stake
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('unstake')}
-              className={`rounded-full px-7 py-2 text-base font-semibold transition-colors ${
-                !isStakeTab
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500'
-              }`}
+              className={cn(
+                'rounded-full px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide transition sm:px-5 sm:text-sm',
+                activeTab === 'unstake'
+                  ? 'bg-gradient-to-r from-[#dfea8a] to-[#b8cf56] text-[#1a2610] shadow-md ring-2 ring-white/80'
+                  : 'text-[#5c534a] hover:text-[#1a2610]',
+              )}
             >
               Unstake
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('delegate')}
+              className={cn(
+                'rounded-full px-3.5 py-2.5 text-xs font-bold uppercase tracking-wide transition sm:px-5 sm:text-sm',
+                activeTab === 'delegate'
+                  ? 'bg-gradient-to-r from-[#dfea8a] to-[#b8cf56] text-[#1a2610] shadow-md ring-2 ring-white/80'
+                  : 'text-[#5c534a] hover:text-[#1a2610]',
+              )}
+            >
+              Verifier
+            </button>
           </div>
         </div>
 
-        <div className="mb-4 flex flex-col">
-          <label
-            htmlFor="stake-amount"
-            className="mb-2 block text-xs font-semibold text-gray-700"
-          >
-            Enter amount
-          </label>
-          <div className="flex flex-row items-center rounded-xl border border-gray-300 bg-white">
-            <input
-              id="stake-amount"
-              type="text"
-              inputMode="decimal"
-              placeholder="0.0"
-              value={activeAmount}
-              onChange={e => setActiveAmount(e.target.value)}
-              disabled={!account?.address || isActionLoading}
-              className="min-w-0 flex-1 border-0 bg-transparent p-3 pr-2 text-base text-gray-900 placeholder:text-gray-400 focus:ring-0 disabled:bg-gray-50"
-            />
-            <button
-              type="button"
-              onClick={() =>
-                isStakeTab
-                  ? setInputAmount(tokenBalance)
-                  : setUnstakeAmount(stakedBalance)
-              }
-              disabled={!account?.address || isActionLoading}
-              className="mr-2 rounded-md border border-gray-200 bg-gray-100 px-2.5 py-1.5 text-xs font-semibold text-[#435f24] disabled:opacity-50"
-            >
-              Max
-            </button>
-          </div>
-
-          {isStakeTab ? (
-            <button
-              type="button"
-              onClick={needsApproval ? handleApprove : handleStake}
-              disabled={needsApproval ? !canApprove : !canStake}
-              className="mt-5 flex min-w-[160px] items-center justify-center self-center rounded-xl bg-gray-800 px-8 py-3 disabled:opacity-50"
-            >
-              {isActionLoading ? (
-                <span
-                  className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
-                  aria-hidden
+        {activeTab !== 'delegate' ? (
+          <div className="mb-4 rounded-2xl bg-gradient-to-br from-[#435F24]/30 via-[#DFEA8A]/25 to-emerald-400/25 p-[1.5px] shadow-xl">
+            <div className="rounded-[14px] bg-gradient-to-b from-white/92 to-white/70 p-5 backdrop-blur-xl">
+              <label
+                htmlFor="stake-amount"
+                className="mb-2 block text-[11px] font-bold uppercase tracking-[0.14em] text-[#5c534a]"
+              >
+                Amount
+              </label>
+              <div className="tg-field flex flex-row items-center overflow-hidden">
+                <input
+                  id="stake-amount"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.0"
+                  value={activeAmount}
+                  onChange={e => setActiveAmount(e.target.value)}
+                  disabled={!account?.address || isActionLoading}
+                  className="min-w-0 flex-1 border-0 bg-transparent p-3.5 pr-2 text-lg font-semibold text-[#0f160c] placeholder:text-[#9ca3af] focus:ring-0 disabled:opacity-50"
                 />
-              ) : (
-                <span className="text-base font-semibold text-white">
-                  {needsApproval ? 'Approve' : 'Stake'}
-                </span>
-              )}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleUnstake}
-              disabled={!canUnstake}
-              className="mt-5 flex min-w-[160px] items-center justify-center self-center rounded-xl bg-gray-800 px-8 py-3 disabled:opacity-50"
-            >
-              {isUnstaking ? (
-                <span
-                  className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
-                  aria-hidden
-                />
-              ) : (
-                <span className="text-base font-semibold text-white">
-                  Unstake
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-
-        {!isVerifier && (
-          <div className="my-4 rounded-lg border border-green-200 bg-green-50 p-3">
-            {meetsVerifierStakeThreshold ? (
-              <div className="flex flex-row items-center justify-between gap-3">
-                <p className="flex-1 text-sm text-gray-700">
-                  You&apos;ve staked enough to
-                </p>
                 <button
                   type="button"
-                  onClick={handleRequestVerifier}
-                  disabled={!account?.address || isRequestingVerifier}
-                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={() =>
+                    isStakeTab
+                      ? setInputAmount(tokenBalance)
+                      : setUnstakeAmount(stakedBalance)
+                  }
+                  disabled={!account?.address || isActionLoading}
+                  className="mr-2 rounded-xl bg-gradient-to-r from-[#435F24] to-[#303E1A] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md disabled:opacity-50"
                 >
-                  {isRequestingVerifier ? (
-                    <>
-                      <span
-                        className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
-                        aria-hidden
-                      />
-                      <span>Requesting...</span>
-                    </>
-                  ) : (
-                    'Become a verifier'
-                  )}
+                  Max
                 </button>
               </div>
-            ) : (
-              <p className="mt-0.5 text-center text-sm text-gray-700">
-                You need at least{' '}
-                <span className="font-semibold">
-                  {VALIDATORS_MINIMUM_TGN_TOKENS} {symbol}
-                </span>{' '}
-                staked to become a verifier
+
+              {isStakeTab ? (
+                <button
+                  type="button"
+                  onClick={needsApproval ? handleApprove : handleStake}
+                  disabled={needsApproval ? !canApprove : !canStake}
+                  className="tg-cta mt-6 flex w-full items-center justify-center py-3.5 text-base font-bold disabled:pointer-events-none disabled:opacity-45"
+                >
+                  {isActionLoading ? (
+                    <span
+                      className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#16210c]/30 border-t-[#16210c]"
+                      aria-hidden
+                    />
+                  ) : (
+                    needsApproval ? 'Approve for vault' : 'Stake TGN'
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleUnstake}
+                  disabled={!canUnstake}
+                  className="mt-6 flex w-full items-center justify-center rounded-2xl border-2 border-[#f1340e]/35 bg-gradient-to-r from-[#ffebd5] to-[#ffdbd3] py-3.5 text-base font-bold text-[#b91c1c] shadow-lg transition active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
+                >
+                  {isUnstaking ? (
+                    <span
+                      className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#b91c1c]/30 border-t-[#b91c1c]"
+                      aria-hidden
+                    />
+                  ) : (
+                    'Unstake from vault'
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="mb-4 rounded-2xl bg-gradient-to-br from-emerald-500/35 via-[#6B8C3B]/28 to-teal-400/28 p-[1.5px] shadow-xl">
+            <div className="relative overflow-hidden rounded-[14px] bg-gradient-to-b from-emerald-50/95 via-white/85 to-white/70 px-5 py-5 backdrop-blur-xl">
+              <div className="pointer-events-none absolute -right-8 top-0 h-32 w-32 rounded-full bg-emerald-300/25 blur-2xl" />
+              <div className="relative flex items-start gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#435F24] to-[#6B8C3B] shadow-lg ring-2 ring-white/70">
+                  <HiUsers className="h-6 w-6 text-white" aria-hidden />
+                </span>
+                <div>
+                  <h2 className="text-base font-black text-[#142010]">
+                    Verifier registration
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#435F24]">
+                    Stake · delegate · review
+                  </p>
+                </div>
+              </div>
+              <p className="relative mt-4 text-sm leading-relaxed text-[#374151]">
+                Staking locks TGN in the vault. <strong>Delegating</strong> here
+                registers you as a <strong>verifier</strong> so your stake backs
+                submission reviews.
               </p>
-            )}
+              <ol className="relative mt-3 list-decimal space-y-2 pl-5 text-sm text-[#374151]">
+                <li>
+                  Use <strong>Stake</strong> to deposit (at least{' '}
+                  {VALIDATORS_MINIMUM_TGN_TOKENS} {symbol} to request verifier).
+                </li>
+                <li>
+                  Tap <strong>Become a verifier</strong> when your stake
+                  qualifies.
+                </li>
+              </ol>
+              {!isVerifier ? (
+                meetsVerifierStakeThreshold ? (
+                  <div className="relative mt-5 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleRequestVerifier}
+                      disabled={!account?.address || isRequestingVerifier}
+                      className="tg-cta inline-flex min-w-[12rem] items-center justify-center gap-2 px-6 py-3 text-sm font-bold disabled:opacity-50"
+                    >
+                      {isRequestingVerifier ? (
+                        <>
+                          <span
+                            className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#16210c]/30 border-t-[#16210c]"
+                            aria-hidden
+                          />
+                          Requesting…
+                        </>
+                      ) : (
+                        'Become a verifier'
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="relative mt-5 rounded-2xl border border-amber-200/80 bg-amber-50/90 p-4 text-center text-sm font-medium text-amber-950">
+                    Stake at least{' '}
+                    <span className="font-bold">
+                      {VALIDATORS_MINIMUM_TGN_TOKENS} {symbol}
+                    </span>{' '}
+                    first, then return here.
+                  </p>
+                )
+              ) : (
+                <p className="relative mt-5 rounded-2xl border border-emerald-300/60 bg-emerald-100/70 p-4 text-center text-sm font-semibold text-emerald-950">
+                  You&apos;re a verifier — thank you for backing fair reviews.
+                </p>
+              )}
+            </div>
           </div>
         )}
+
+        {activeTab !== 'delegate' && !isVerifier ? (
+          meetsVerifierStakeThreshold ? (
+            <p className="mt-4 text-center text-sm text-[#4d534a]">
+              Next:{' '}
+              <button
+                type="button"
+                className="font-bold text-[#435F24] underline decoration-[#DFEA8A] underline-offset-2"
+                onClick={() => setActiveTab('delegate')}
+              >
+                Verifier tab
+              </button>{' '}
+              to register.
+            </p>
+          ) : (
+            <p className="mt-4 text-center text-sm text-[#6b6560]">
+              Stake{' '}
+              <span className="font-bold text-[#435F24]">
+                {VALIDATORS_MINIMUM_TGN_TOKENS}+ {symbol}
+              </span>
+              , then open{' '}
+              <button
+                type="button"
+                className="font-bold text-[#435F24] underline decoration-[#DFEA8A] underline-offset-2"
+                onClick={() => setActiveTab('delegate')}
+              >
+                Verifier
+              </button>
+              .
+            </p>
+          )
+        ) : null}
       </div>
     </div>
   )
