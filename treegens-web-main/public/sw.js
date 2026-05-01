@@ -3,7 +3,7 @@
  * Handles offline video upload queue and background sync
  */
 
-const SW_VERSION = 'v1.268'
+const SW_VERSION = 'v1.269'
 const STATIC_CACHE = `treegens-static-${SW_VERSION}` // bump to refresh HTML/images
 const RUNTIME_CACHE = `treegens-runtime-${SW_VERSION}` // keep stable for Next build assets
 const FF_CACHE = 'treegens-ffmpeg-core' // dedicated, never-versioned cache for ffmpeg core
@@ -80,7 +80,7 @@ const STATIC_ASSETS = [
   '/earn',
   '/inbox',
   '/submissions/create',
-  '/manifest.json',
+  '/manifest.webmanifest',
   '/img/treegens-logo.svg',
   '/img/tree.svg',
   '/img/home-icon.svg',
