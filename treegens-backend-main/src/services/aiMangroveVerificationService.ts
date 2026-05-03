@@ -146,9 +146,106 @@ export function collectAiResponseRoots(raw: unknown): unknown[] {
   return roots
 }
 
-export function extractCountFromAiResponse(raw: unknown): number | undefined {
-  for (const root of collectAiResponseRoots(raw)) {
+/** Video APIs often put one entry per frame under `outputs` or `results`. */
+function getPerFrameResultArray(raw: unknown): unknown[] | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const top = raw as Record<string, unknown>
+  if (Array.isArray(top.outputs) && top.outputs.length > 0) return top.outputs
+  if (Array.isArray(top.results) && top.results.length > 0) return top.results
+  const data = top.data
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const d = data as Record<string, unknown>
+    if (Array.isArray(d.outputs) && d.outputs.length > 0) return d.outputs
+    if (Array.isArray(d.results) && d.results.length > 0) return d.results
+  }
+  return undefined
+}
+
+/** Paths that usually encode summed video detections (not per-frame). See env AI_RESPONSE_CUMULATIVE_COUNT_PATHS. */
+function isCumulativeCountPath(pathStr: string): boolean {
+  const mark = new Set(env.AI_RESPONSE_CUMULATIVE_COUNT_PATHS)
+  if (mark.has(pathStr)) return true
+  const last = pathStr.includes('.')
+    ? pathStr.slice(pathStr.lastIndexOf('.') + 1)
+    : pathStr
+  return mark.has(last)
+}
+
+function extractCountFromSingleBlob(blob: unknown): number | undefined {
+  for (const root of collectAiResponseRoots(blob)) {
     const c = extractFromPaths(root, env.AI_RESPONSE_COUNT_PATHS, coerceCount)
+    if (c !== undefined) return c
+  }
+  return undefined
+}
+
+/** Collect per-frame / per-chunk counts when the model returns an array (common for video). */
+export function extractPerFrameCountsFromAiResponse(raw: unknown): number[] {
+  const frames = getPerFrameResultArray(raw)
+  if (!frames) return []
+  const out: number[] = []
+  for (const chunk of frames) {
+    const c = extractCountFromSingleBlob(chunk)
+    if (c !== undefined) out.push(c)
+  }
+  return out
+}
+
+export function aggregateOutputCounts(
+  counts: number[],
+  mode:
+    | 'max'
+    | 'min'
+    | 'sum'
+    | 'median'
+    | 'mean'
+    | 'first'
+    | 'last',
+): number {
+  if (counts.length === 0) return 0
+  if (counts.length === 1) return counts[0]
+  const sorted = [...counts].sort((a, b) => a - b)
+  switch (mode) {
+    case 'sum':
+      return counts.reduce((a, b) => a + b, 0)
+    case 'min':
+      return Math.min(...counts)
+    case 'max':
+      return Math.max(...counts)
+    case 'first':
+      return counts[0]
+    case 'last':
+      return counts[counts.length - 1]
+    case 'mean': {
+      const s = counts.reduce((a, b) => a + b, 0)
+      return Math.max(0, Math.floor(s / counts.length))
+    }
+    case 'median': {
+      const mid = Math.floor(sorted.length / 2)
+      return sorted.length % 2 === 1
+        ? sorted[mid]
+        : Math.max(0, Math.floor((sorted[mid - 1] + sorted[mid]) / 2))
+    }
+    default:
+      return Math.max(...counts)
+  }
+}
+
+export function extractCountFromAiResponse(raw: unknown): number | undefined {
+  const perFrame = extractPerFrameCountsFromAiResponse(raw)
+  if (perFrame.length > 0) {
+    return aggregateOutputCounts(perFrame, env.AI_RESPONSE_OUTPUTS_AGGREGATION)
+  }
+
+  const frames = getPerFrameResultArray(raw)
+  const multiFrame = frames !== undefined && frames.length > 1
+
+  for (const root of collectAiResponseRoots(raw)) {
+    const paths =
+      root === raw && multiFrame
+        ? env.AI_RESPONSE_COUNT_PATHS.filter(p => !isCumulativeCountPath(p))
+        : env.AI_RESPONSE_COUNT_PATHS
+    const c = extractFromPaths(root, paths, coerceCount)
     if (c !== undefined) return c
   }
   return undefined

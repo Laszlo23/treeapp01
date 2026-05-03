@@ -329,6 +329,50 @@ class EnvironmentConfig {
       .filter(Boolean)
   }
 
+  /**
+   * Path names (single segment, matching end of dot-paths in AI_RESPONSE_COUNT_PATHS) that usually
+   * mean “sum of all frame detections” for video — skipped on the **root** object when the
+   * response also has a multi-item `outputs` / `results` array and per-frame rows had no parseable
+   * count, so we do not return an inflated total.
+   */
+  get AI_RESPONSE_CUMULATIVE_COUNT_PATHS() {
+    const def = 'totalDetections,detected'
+    return (process.env.AI_RESPONSE_CUMULATIVE_COUNT_PATHS || def)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+  }
+
+  /**
+   * When the model returns a per-frame `outputs` or `results` array, combine those counts with
+   * this reducer. Default `max` matches “most seedlings visible in any one frame” and avoids
+   * summing the same plants across frames. Set to `sum` if your API encodes disjoint regions per row.
+   */
+  get AI_RESPONSE_OUTPUTS_AGGREGATION():
+    | 'max'
+    | 'min'
+    | 'sum'
+    | 'median'
+    | 'mean'
+    | 'first'
+    | 'last' {
+    const v = (process.env.AI_RESPONSE_OUTPUTS_AGGREGATION || 'max')
+      .trim()
+      .toLowerCase()
+    if (
+      v === 'max' ||
+      v === 'min' ||
+      v === 'sum' ||
+      v === 'median' ||
+      v === 'mean' ||
+      v === 'first' ||
+      v === 'last'
+    ) {
+      return v
+    }
+    return 'max'
+  }
+
   /** Comma-separated paths to try for confidence in 0–1 or 0–100. */
   get AI_RESPONSE_CONFIDENCE_PATHS() {
     const def =

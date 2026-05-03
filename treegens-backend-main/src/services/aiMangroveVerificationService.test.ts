@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import axios from 'axios'
 import {
+  aggregateOutputCounts,
   coerceConfidence,
   coerceCount,
   collectAiResponseRoots,
   extractConfidenceFromAiResponse,
   extractCountFromAiResponse,
+  extractPerFrameCountsFromAiResponse,
   verifyMangrovePlantVideo,
 } from './aiMangroveVerificationService'
 
@@ -47,6 +49,44 @@ test('extractCountFromAiResponse finds count inside outputs[0]', () => {
     }),
     4,
   )
+})
+
+test('extractCountFromAiResponse aggregates per-frame outputs with max (not root totalDetections sum)', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      totalDetections: 300,
+      outputs: [
+        { mangrove_count: 2 },
+        { mangrove_count: 3 },
+        { mangrove_count: 2 },
+      ],
+    }),
+    3,
+  )
+})
+
+test('extractCountFromAiResponse uses results[] when present', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      totalDetections: 100,
+      results: [{ count: 1 }, { count: 4 }, { count: 1 }],
+    }),
+    4,
+  )
+})
+
+test('extractPerFrameCountsFromAiResponse lists per-row counts', () => {
+  assert.deepEqual(
+    extractPerFrameCountsFromAiResponse({
+      outputs: [{ seedling_count: 1 }, { seedling_count: 2 }],
+    }),
+    [1, 2],
+  )
+})
+
+test('aggregateOutputCounts max and sum', () => {
+  assert.equal(aggregateOutputCounts([1, 5, 2], 'max'), 5)
+  assert.equal(aggregateOutputCounts([1, 5, 2], 'sum'), 8)
 })
 
 test('extractCountFromAiResponse reads Roboflow verification_json output', () => {
