@@ -1,5 +1,8 @@
 'use client'
 
+import type { ISubmissionAiVerification } from '@/types'
+import { PlantAiResultSummary } from '@/components/submission/PlantAiResultSummary'
+
 export interface UploadProgressModalProps {
   isOpen: boolean
   onClose: () => void
@@ -19,6 +22,10 @@ export interface UploadProgressModalProps {
     success?: boolean
     error?: string
   }
+  /** Mangrove plant clip: show AI count in-modal before user continues */
+  plantAiVerification?: ISubmissionAiVerification | null
+  awaitingMangroveAiContinue?: boolean
+  onContinueAfterMangroveAi?: () => void
 }
 
 export default function UploadProgressModal({
@@ -27,8 +34,16 @@ export default function UploadProgressModal({
   isQueueMode,
   compression,
   upload,
+  plantAiVerification,
+  awaitingMangroveAiContinue,
+  onContinueAfterMangroveAi,
 }: UploadProgressModalProps) {
   if (!isOpen) return null
+
+  const showMangroveAiPanel =
+    !!awaitingMangroveAiContinue &&
+    typeof onContinueAfterMangroveAi === 'function' &&
+    (!!upload.success || plantAiVerification != null)
 
   const niceNumber = (n?: number) =>
     typeof n === 'number' ? n.toFixed(2) : undefined
@@ -50,7 +65,7 @@ export default function UploadProgressModal({
       <div className="relative w-full md:max-w-lg md:rounded-xl md:shadow-2xl md:mb-0 mb-0 bg-white border border-gray-200 p-4 md:p-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-gray-900">Video Upload</h3>
-          {((!isQueueMode && upload.success) ||
+          {((!isQueueMode && upload.success && !showMangroveAiPanel) ||
             (isQueueMode && compression.compressedSizeMB)) && (
             <button onClick={onClose} className="text-gray-500 text-sm">
               Close
@@ -130,9 +145,24 @@ export default function UploadProgressModal({
             )}
           </section>
 
-          {upload.success && (
+          {upload.success && !showMangroveAiPanel && (
             <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-green-800 text-xs">
               ✅ Upload completed successfully.
+            </div>
+          )}
+          {showMangroveAiPanel && (
+            <div className="space-y-3">
+              <PlantAiResultSummary
+                variant="hero"
+                ai={plantAiVerification ?? null}
+              />
+              <button
+                type="button"
+                className="w-full rounded-lg bg-[#1b5e2a] px-4 py-3 text-sm font-semibold text-white hover:bg-[#164a22] focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2"
+                onClick={onContinueAfterMangroveAi}
+              >
+                Continue
+              </button>
             </div>
           )}
           {upload.error && (
@@ -140,7 +170,7 @@ export default function UploadProgressModal({
               ❌ {upload.error}
             </div>
           )}
-          {upload.success && (
+          {upload.success && !showMangroveAiPanel && (
             <div className="flex justify-end">
               <button
                 className="mt-2 px-3 py-1.5 text-xs rounded-md bg-green-600 text-white hover:bg-green-700"

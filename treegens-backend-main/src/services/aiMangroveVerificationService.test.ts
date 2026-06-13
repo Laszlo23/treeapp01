@@ -84,6 +84,52 @@ test('extractPerFrameCountsFromAiResponse lists per-row counts', () => {
   )
 })
 
+test('extractPerFrameCountsFromAiResponse ignores cumulative totals inside per-frame chunks', () => {
+  assert.deepEqual(
+    extractPerFrameCountsFromAiResponse({
+      outputs: [
+        { totalDetections: 999, mangrove_count: 1 },
+        { totalDetections: 999, mangrove_count: 4 },
+      ],
+    }),
+    [1, 4],
+  )
+  assert.equal(
+    extractCountFromAiResponse({
+      outputs: [
+        { totalDetections: 999, mangrove_count: 1 },
+        { totalDetections: 999, mangrove_count: 4 },
+      ],
+    }),
+    4,
+  )
+})
+
+test('extractCountFromAiResponse prefers unique object tracking when detections are present', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      outputs: [
+        {
+          predictions: [
+            // same object in both frames (slightly moved)
+            { x: 10, y: 10, width: 10, height: 10, class: 'mangrove' },
+            // another object
+            { x: 40, y: 40, width: 12, height: 12, class: 'mangrove' },
+          ],
+        },
+        {
+          predictions: [
+            { x: 11, y: 10, width: 10, height: 10, class: 'mangrove' },
+            // new object enters
+            { x: 80, y: 80, width: 10, height: 10, class: 'mangrove' },
+          ],
+        },
+      ],
+    }),
+    3,
+  )
+})
+
 test('aggregateOutputCounts max and sum', () => {
   assert.equal(aggregateOutputCounts([1, 5, 2], 'max'), 5)
   assert.equal(aggregateOutputCounts([1, 5, 2], 'sum'), 8)
@@ -122,6 +168,65 @@ test('extractCountFromAiResponse parses verification_json when emitted as JSON s
         '{"seedling_count":5,"average_confidence":0.8,"plant_type":"Rhizophora"}',
     }),
     5,
+  )
+})
+
+test('extractCountFromAiResponse uses NMS over bbox tuples and ignores inflated seedling_count', () => {
+  const dense = extractCountFromAiResponse({
+    outputs: [
+      {
+        verification_json: JSON.stringify({
+          seedling_count: 175,
+          average_confidence: 0.88,
+          status: 'rejected',
+          detections: [
+            {
+              class: 'mangrove',
+              confidence: 0.96,
+              bbox: [100, 100, 120, 130],
+            },
+            {
+              class: 'mangrove',
+              confidence: 0.95,
+              bbox: [105, 105, 122, 128],
+            },
+            {
+              class: 'mangrove',
+              confidence: 0.94,
+              bbox: [400, 80, 430, 120],
+            },
+          ],
+        }),
+      },
+    ],
+  })
+  assert.equal(dense, 2)
+})
+
+test('extractCountFromAiResponse drops mega-box before counting', () => {
+  assert.equal(
+    extractCountFromAiResponse({
+      outputs: [
+        {
+          verification_json: JSON.stringify({
+            seedling_count: 10,
+            detections: [
+              {
+                class: 'mangrove',
+                confidence: 0.99,
+                bbox: [8, 2, 425, 448],
+              },
+              {
+                class: 'mangrove',
+                confidence: 0.9,
+                bbox: [100, 100, 130, 140],
+              },
+            ],
+          }),
+        },
+      ],
+    }),
+    1,
   )
 })
 
@@ -276,6 +381,66 @@ test('verifyMangrovePlantVideo ultralytics posts multipart when configured', asy
     })
     assert.equal(result.ok, true)
     if (result.ok) assert.equal(result.countedMangroves, 3)
+  } finally {
+    axios.post = originalPost
+  }
+})
+
+test('verifyMangrovePlantVideo treegens_ml posts to planting /internal/verify-video', async t => {
+  const keys = [
+    'AI_PROVIDER',
+    'PLANTING_VERIFICATION_API_URL',
+    'PLANTING_VERIFICATION_INTERNAL_KEY',
+  ] as const
+  const restore = keys.map(k => {
+    const v = process.env[k]
+    return () => {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+  t.after(() => restore.forEach(fn => fn()))
+
+  process.env.AI_PROVIDER = 'treegens_ml'
+  process.env.PLANTING_VERIFICATION_API_URL = 'http://127.0.0.1:8000'
+  process.env.PLANTING_VERIFICATION_INTERNAL_KEY = 'test-internal-key'
+
+  type PostFn = typeof axios.post
+  const originalPost = axios.post
+  axios.post = (async (url: string) => {
+    assert.equal(url, 'http://127.0.0.1:8000/internal/verify-video')
+    return {
+      status: 200,
+      data: {
+        unique_tree_estimate: 101,
+        verification: {
+          aggregate_pass: true,
+          model: {
+            tree_detections: [{ confidence: 0.92 }, { confidence: 0.88 }],
+          },
+        },
+      },
+    }
+  }) as PostFn
+
+  try {
+    const result = await verifyMangrovePlantVideo({
+      videoBuffer: Buffer.from('fake-mp4'),
+      filename: 'plant.mp4',
+      contentType: 'video/mp4',
+      ctx: {
+        submissionId: 'sub-ml',
+        userWalletAddress: '0xabc',
+        latitude: 1.2,
+        longitude: 3.4,
+        declaredTreesPlanted: 101,
+      },
+    })
+    assert.equal(result.ok, true)
+    if (result.ok) {
+      assert.equal(result.countedMangroves, 101)
+      assert.equal(result.confidence, 0.9)
+    }
   } finally {
     axios.post = originalPost
   }

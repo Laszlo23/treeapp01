@@ -25,6 +25,7 @@ import {
   VideoType,
   VideoUploadResponse,
 } from '@/services/videoService'
+import type { ISubmissionAiVerification } from '@/types'
 import { VIDEO_CONFIG } from '@/utils/constants'
 import { validateVideoFile } from '@/utils/videoValidation'
 
@@ -55,6 +56,12 @@ export default function NewPlant() {
   const [celebrationVariant, setCelebrationVariant] = useState<
     'submitted' | 'queued'
   >('submitted')
+  const [plantAiAfterUpload, setPlantAiAfterUpload] =
+    useState<ISubmissionAiVerification | null>(null)
+  const [mangroveUploadAwaitingContinue, setMangroveUploadAwaitingContinue] =
+    useState(false)
+  const [celebrationOfflineMangrove, setCelebrationOfflineMangrove] =
+    useState(false)
   const [validationError, setValidationError] = useState<string>('')
   const [isMounted, setIsMounted] = useState(false)
   const [isQueueing, setIsQueueing] = useState(false)
@@ -75,6 +82,17 @@ export default function NewPlant() {
 
   const dismissSubmissionCelebrate = useCallback(() => {
     setShowSubmissionCelebrate(false)
+    setPlantAiAfterUpload(null)
+    setCelebrationOfflineMangrove(false)
+  }, [])
+
+  const finishMangroveUploadModalAndCelebrate = useCallback(() => {
+    setMangroveUploadAwaitingContinue(false)
+    setShowUploadModal(false)
+    setCelebrationVariant('submitted')
+    setCelebrationOfflineMangrove(false)
+    setShowSubmissionCelebrate(true)
+    toast.success('Submission complete')
   }, [])
 
   // Use the custom hook instead of managing state manually
@@ -350,6 +368,7 @@ export default function NewPlant() {
       )
 
       console.log('Upload successful:', result)
+      setUploadProgress(100)
       setUploadSuccess(true)
       return result
     } catch (error) {
@@ -485,10 +504,21 @@ export default function NewPlant() {
     setUploadError('')
     setValidationError('')
 
+    const isMangrove = resolvedTreeType.toLowerCase() === 'mangrove'
+
     try {
       if (isUserOnline) {
         setShowUploadModal(true)
-        await uploadVideo(plantFile, VideoType.PLANT, submissionIdForPlant)
+        setPlantAiAfterUpload(null)
+        setMangroveUploadAwaitingContinue(false)
+        const plantRes = await uploadVideo(
+          plantFile,
+          VideoType.PLANT,
+          submissionIdForPlant,
+        )
+        const ai = plantRes?.data?.aiVerification
+        setPlantAiAfterUpload(ai ?? null)
+
         handleRemoveVideo(VideoType.PLANT)
         setMangroveAnswer(null)
         setTreetype('')
@@ -496,10 +526,33 @@ export default function NewPlant() {
         setHasUploadedLandVideo(false)
         setServerSubmissionId(null)
         await refetchVideos()
-        setShowUploadModal(false)
-        setCelebrationVariant('submitted')
-        setShowSubmissionCelebrate(true)
-        toast.success('Submission complete')
+
+        if (isMangrove) {
+          setMangroveUploadAwaitingContinue(false)
+          setShowUploadModal(false)
+          setCelebrationVariant('submitted')
+          setCelebrationOfflineMangrove(false)
+          setShowSubmissionCelebrate(true)
+          const counted = ai?.countedMangroves
+          if (ai?.status === 'completed' && typeof counted === 'number') {
+            toast.success(
+              `AI counted ${counted} mangrove seedling${counted === 1 ? '' : 's'} in your video`,
+            )
+          } else if (ai?.status === 'failed') {
+            toast.error(
+              ai.error?.trim() ||
+                'AI count failed — a verifier will review your video.',
+            )
+          } else {
+            toast.success('Submission complete')
+          }
+        } else {
+          setShowUploadModal(false)
+          setCelebrationVariant('submitted')
+          setCelebrationOfflineMangrove(false)
+          setShowSubmissionCelebrate(true)
+          toast.success('Submission complete')
+        }
       } else {
         resetCompressionProgress()
         setShowUploadModal(true)
@@ -534,7 +587,9 @@ export default function NewPlant() {
         setServerSubmissionId(null)
 
         setShowUploadModal(false)
+        setPlantAiAfterUpload(null)
         setCelebrationVariant('queued')
+        setCelebrationOfflineMangrove(isMangrove)
         setShowSubmissionCelebrate(true)
         toast.success(
           'Plant video queued. It will upload automatically when you are back online.',
@@ -542,6 +597,8 @@ export default function NewPlant() {
       }
     } catch (error) {
       console.error('Plant upload error:', error)
+      setMangroveUploadAwaitingContinue(false)
+      setPlantAiAfterUpload(null)
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -925,6 +982,8 @@ export default function NewPlant() {
         open={showSubmissionCelebrate}
         onFinished={dismissSubmissionCelebrate}
         variant={celebrationVariant}
+        mangrovePlantAi={plantAiAfterUpload}
+        queuedOfflineMangrove={celebrationOfflineMangrove}
       />
 
       <UploadProgressModal
@@ -942,11 +1001,16 @@ export default function NewPlant() {
         }}
         upload={{
           progress: isUserOnline ? uploadProgress : 0,
-          success: isUserOnline && uploadProgress === 100 && uploadSuccess,
+          success: isUserOnline && uploadSuccess,
           message: isUserOnline
-            ? undefined
+            ? mangroveUploadAwaitingContinue
+              ? 'Upload complete · review AI count below'
+              : undefined
             : 'Video will be uploaded when online',
         }}
+        plantAiVerification={plantAiAfterUpload}
+        awaitingMangroveAiContinue={mangroveUploadAwaitingContinue}
+        onContinueAfterMangroveAi={finishMangroveUploadModalAndCelebrate}
       />
     </div>
   )

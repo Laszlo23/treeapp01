@@ -5,6 +5,7 @@ import {
   postRoboflowWorkflowWithImage,
   resolveRoboflowPostUrl,
 } from './roboflowWorkflowMangrove'
+import { verifyMangrovePlantVideoPlantingApi } from './plantingVerificationService'
 import { extractMiddleFrameJpegFromMp4 } from './videoMiddleFrameJpeg'
 
 export type AiMangroveVerifyContext = {
@@ -179,13 +180,29 @@ function extractCountFromSingleBlob(blob: unknown): number | undefined {
   return undefined
 }
 
+function extractCountFromSingleBlobWithPaths(
+  blob: unknown,
+  paths: string[],
+): number | undefined {
+  for (const root of collectAiResponseRoots(blob)) {
+    const c = extractFromPaths(root, paths, coerceCount)
+    if (c !== undefined) return c
+  }
+  return undefined
+}
+
 /** Collect per-frame / per-chunk counts when the model returns an array (common for video). */
 export function extractPerFrameCountsFromAiResponse(raw: unknown): number[] {
   const frames = getPerFrameResultArray(raw)
   if (!frames) return []
   const out: number[] = []
+  // Per-row chunks sometimes repeat cumulative video totals (e.g. `totalDetections`) which inflate counts.
+  // When extracting per-frame counts, prefer non-cumulative keys only.
+  const nonCumulativePaths = env.AI_RESPONSE_COUNT_PATHS.filter(
+    p => !isCumulativeCountPath(p),
+  )
   for (const chunk of frames) {
-    const c = extractCountFromSingleBlob(chunk)
+    const c = extractCountFromSingleBlobWithPaths(chunk, nonCumulativePaths)
     if (c !== undefined) out.push(c)
   }
   return out
@@ -231,7 +248,287 @@ export function aggregateOutputCounts(
   }
 }
 
+type Box = { x1: number; y1: number; x2: number; y2: number }
+
+function isFiniteBox(b: Box): boolean {
+  return (
+    Number.isFinite(b.x1) &&
+    Number.isFinite(b.y1) &&
+    Number.isFinite(b.x2) &&
+    Number.isFinite(b.y2) &&
+    b.x2 > b.x1 &&
+    b.y2 > b.y1
+  )
+}
+
+function iou(a: Box, b: Box): number {
+  const xA = Math.max(a.x1, b.x1)
+  const yA = Math.max(a.y1, b.y1)
+  const xB = Math.min(a.x2, b.x2)
+  const yB = Math.min(a.y2, b.y2)
+  const interW = Math.max(0, xB - xA)
+  const interH = Math.max(0, yB - yA)
+  const inter = interW * interH
+  if (inter <= 0) return 0
+  const areaA = (a.x2 - a.x1) * (a.y2 - a.y1)
+  const areaB = (b.x2 - b.x1) * (b.y2 - b.y1)
+  const denom = areaA + areaB - inter
+  return denom > 0 ? inter / denom : 0
+}
+
+type Detection = {
+  box: Box
+  klass?: string
+  id?: string
+  /** Detection score when provider supplies it (e.g. Roboflow). */
+  confidence?: number
+}
+
+function toNumber(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim()))
+    return Number(v.trim())
+  return undefined
+}
+
+function readBoxFromDetection(raw: unknown): Box | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const rec = raw as Record<string, unknown>
+
+  // Common (center x/y + width/height)
+  const x = toNumber(rec.x ?? rec.cx ?? rec.center_x)
+  const y = toNumber(rec.y ?? rec.cy ?? rec.center_y)
+  const w = toNumber(rec.width ?? rec.w)
+  const h = toNumber(rec.height ?? rec.h)
+  if (
+    x !== undefined &&
+    y !== undefined &&
+    w !== undefined &&
+    h !== undefined
+  ) {
+    const box = {
+      x1: x - w / 2,
+      y1: y - h / 2,
+      x2: x + w / 2,
+      y2: y + h / 2,
+    }
+    return isFiniteBox(box) ? box : undefined
+  }
+
+  // Common (x1/y1/x2/y2)
+  const x1 = toNumber(rec.x1 ?? rec.left ?? rec.xmin ?? rec.x_min)
+  const y1 = toNumber(rec.y1 ?? rec.top ?? rec.ymin ?? rec.y_min)
+  const x2 = toNumber(rec.x2 ?? rec.right ?? rec.xmax ?? rec.x_max)
+  const y2 = toNumber(rec.y2 ?? rec.bottom ?? rec.ymax ?? rec.y_max)
+  if (
+    x1 !== undefined &&
+    y1 !== undefined &&
+    x2 !== undefined &&
+    y2 !== undefined
+  ) {
+    const box = { x1, y1, x2, y2 }
+    return isFiniteBox(box) ? box : undefined
+  }
+
+  // Roboflow / OpenAPI style: bbox: [x1, y1, x2, y2]
+  const bboxRaw = rec.bbox
+  if (Array.isArray(bboxRaw) && bboxRaw.length >= 4) {
+    const bx1 = toNumber(bboxRaw[0])
+    const by1 = toNumber(bboxRaw[1])
+    const bx2 = toNumber(bboxRaw[2])
+    const by2 = toNumber(bboxRaw[3])
+    if (
+      bx1 !== undefined &&
+      by1 !== undefined &&
+      bx2 !== undefined &&
+      by2 !== undefined
+    ) {
+      const box = { x1: bx1, y1: by1, x2: bx2, y2: by2 }
+      return isFiniteBox(box) ? box : undefined
+    }
+  }
+
+  // Nested bbox object
+  if (bboxRaw && typeof bboxRaw === 'object' && !Array.isArray(bboxRaw)) {
+    return readBoxFromDetection(bboxRaw)
+  }
+
+  return undefined
+}
+
+function readDetectionMeta(raw: unknown): Omit<Detection, 'box'> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const rec = raw as Record<string, unknown>
+  const idRaw =
+    rec.id ??
+    rec.track_id ??
+    rec.trackId ??
+    rec.tracking_id ??
+    rec.trackingId
+  const klassRaw = rec.class ?? rec.label ?? rec.class_name ?? rec.className
+  const id =
+    typeof idRaw === 'string' || typeof idRaw === 'number'
+      ? String(idRaw)
+      : undefined
+  const klass = typeof klassRaw === 'string' ? klassRaw : undefined
+  const confRaw = rec.confidence ?? rec.score
+  let confidence: number | undefined
+  if (typeof confRaw === 'number' && Number.isFinite(confRaw))
+    confidence = confRaw
+
+  return { id, klass, confidence }
+}
+
+function collectDetectionsFromRoot(root: unknown): Detection[] {
+  if (!root || typeof root !== 'object' || Array.isArray(root)) return []
+  const rec = root as Record<string, unknown>
+
+  const candidates: unknown[] = []
+  for (const key of ['predictions', 'detections', 'objects']) {
+    const v = rec[key]
+    if (Array.isArray(v)) candidates.push(...v)
+  }
+
+  const out: Detection[] = []
+  for (const item of candidates) {
+    const box = readBoxFromDetection(item)
+    if (!box) continue
+    const meta = readDetectionMeta(item)
+    out.push({ box, ...meta })
+  }
+  return out
+}
+
+function inferFrameExtents(dets: Detection[]): { fw: number; fh: number } {
+  let maxX = 0
+  let maxY = 0
+  for (const det of dets) {
+    if (!isFiniteBox(det.box)) continue
+    maxX = Math.max(maxX, det.box.x2)
+    maxY = Math.max(maxY, det.box.y2)
+  }
+  return { fw: Math.max(maxX, 1), fh: Math.max(maxY, 1) }
+}
+
+function filterMegaBoxes(dets: Detection[], ratio: number): Detection[] {
+  if (dets.length === 0) return []
+  const { fw, fh } = inferFrameExtents(dets)
+  const frameArea = fw * fh
+  return dets.filter(d => {
+    if (!isFiniteBox(d.box)) return false
+    const a = (d.box.x2 - d.box.x1) * (d.box.y2 - d.box.y1)
+    return a / frameArea <= ratio
+  })
+}
+
+/** Standard greedy NMS, highest confidence retained first. */
+function nonMaxSuppressionDetections(dets: Detection[], iouThresh: number): Detection[] {
+  const finite = dets.filter(d => isFiniteBox(d.box))
+  finite.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+  const keep: Detection[] = []
+  for (const cand of finite) {
+    if (keep.some(k => iou(k.box, cand.box) >= iouThresh)) continue
+    keep.push(cand)
+  }
+  return keep
+}
+
+function collectAllDetectionsFromAiResponse(raw: unknown): Detection[] {
+  const out: Detection[] = []
+  for (const root of collectAiResponseRoots(raw)) {
+    out.push(...collectDetectionsFromRoot(root))
+  }
+  return out
+}
+
+/** Prefer deduped box count when the provider attaches a `detections` list with parseable geometry. */
+function extractCountFromNmsDedup(raw: unknown): number | undefined {
+  const minConf = env.AI_DETECTION_MIN_CONFIDENCE
+  const merged = collectAllDetectionsFromAiResponse(raw).filter(d => {
+    if (!isFiniteBox(d.box)) return false
+    if (minConf <= 0) return true
+    const c = d.confidence
+    if (typeof c !== 'number' || !Number.isFinite(c)) return true
+    return c >= minConf
+  })
+  const filtered = filterMegaBoxes(merged, env.AI_DETECTION_MAX_BOX_AREA_FRACTION)
+  if (filtered.length === 0 && merged.length > 0) {
+    /** All boxes mega-sized vs inferred frame → fall through to scalar fields rather than trusting NMS-only. */
+    return undefined
+  }
+  const base = filtered.length > 0 ? filtered : merged
+  if (base.length === 0) return undefined
+  const kept = nonMaxSuppressionDetections(base, env.AI_DETECTION_NMS_IOU)
+  return kept.length
+}
+
+function extractUniqueCountFromAiResponse(raw: unknown): number | undefined {
+  const frames = getPerFrameResultArray(raw)
+  if (!frames || frames.length === 0) return undefined
+
+  // If provider gives stable track IDs, count distinct.
+  const ids = new Set<string>()
+  let sawAnyId = false
+  for (const chunk of frames) {
+    for (const root of collectAiResponseRoots(chunk)) {
+      for (const det of collectDetectionsFromRoot(root)) {
+        if (det.id) {
+          sawAnyId = true
+          ids.add(det.id)
+        }
+      }
+    }
+  }
+  if (sawAnyId) return ids.size
+
+  // Otherwise do lightweight IoU tracking across frames.
+  const tracks: Array<{ box: Box; klass?: string; lastSeen: number }> = []
+  const IOU_THRESH = 0.5
+  const MAX_MISSED = 2
+
+  for (let frameIdx = 0; frameIdx < frames.length; frameIdx++) {
+    const chunk = frames[frameIdx]
+    const frameDets: Detection[] = []
+    for (const root of collectAiResponseRoots(chunk)) {
+      frameDets.push(...collectDetectionsFromRoot(root))
+    }
+
+    for (const det of frameDets) {
+      if (!isFiniteBox(det.box)) continue
+      let bestIdx = -1
+      let best = 0
+      for (let i = 0; i < tracks.length; i++) {
+        const t = tracks[i]
+        if (t.klass && det.klass && t.klass !== det.klass) continue
+        if (frameIdx - t.lastSeen > MAX_MISSED) continue
+        const score = iou(t.box, det.box)
+        if (score > best) {
+          best = score
+          bestIdx = i
+        }
+      }
+      if (bestIdx >= 0 && best >= IOU_THRESH) {
+        tracks[bestIdx] = {
+          box: det.box,
+          klass: det.klass ?? tracks[bestIdx].klass,
+          lastSeen: frameIdx,
+        }
+      } else {
+        tracks.push({ box: det.box, klass: det.klass, lastSeen: frameIdx })
+      }
+    }
+  }
+
+  return tracks.length > 0 ? tracks.length : undefined
+}
+
 export function extractCountFromAiResponse(raw: unknown): number | undefined {
+  const fromNms = extractCountFromNmsDedup(raw)
+  if (fromNms !== undefined) return fromNms
+
+  const unique = extractUniqueCountFromAiResponse(raw)
+  if (unique !== undefined) return unique
+
   const perFrame = extractPerFrameCountsFromAiResponse(raw)
   if (perFrame.length > 0) {
     return aggregateOutputCounts(perFrame, env.AI_RESPONSE_OUTPUTS_AGGREGATION)
@@ -579,6 +876,20 @@ async function verifyMangrovePlantVideoRoboflow(opts: {
  * Sends plant video bytes to the external mangrove-counting API.
  * If token/path are unset, returns `skipped` (upload should still succeed).
  */
+function plantingFailoverEligible(result: AiMangroveVerifyResult): boolean {
+  if (result.ok || result.skipped) return false
+  const err = 'error' in result ? String(result.error) : ''
+  if (/timeout|ECONNREFUSED|ENOTFOUND|5\d{2}|Planting verification API HTTP 5/i.test(err)) {
+    return true
+  }
+  const raw = 'raw' in result ? result.raw : undefined
+  if (raw && typeof raw === 'object') {
+    const status = (raw as { status?: number }).status
+    if (typeof status === 'number' && status >= 500) return true
+  }
+  return false
+}
+
 export async function verifyMangrovePlantVideo(opts: {
   videoBuffer: Buffer
   filename: string
@@ -586,6 +897,30 @@ export async function verifyMangrovePlantVideo(opts: {
   ctx: AiMangroveVerifyContext
   workflowImageUrl?: string
 }): Promise<AiMangroveVerifyResult> {
+  if (env.AI_PROVIDER === 'treegens_ml') {
+    const primary = await verifyMangrovePlantVideoPlantingApi(opts)
+    if (primary.ok || primary.skipped || !env.AI_FAILOVER_TO_ULTRALYTICS) {
+      return primary
+    }
+    if (!plantingFailoverEligible(primary)) {
+      return primary
+    }
+    const fallback = await verifyMangrovePlantVideoUltralytics(opts)
+    if (fallback.ok && !fallback.skipped) {
+      return {
+        ...fallback,
+        raw: {
+          failover_from: 'treegens_ml',
+          primary_error: 'error' in primary ? primary.error : undefined,
+          primary_raw: 'raw' in primary ? primary.raw : undefined,
+          ...(typeof fallback.raw === 'object' && fallback.raw !== null
+            ? (fallback.raw as Record<string, unknown>)
+            : { response: fallback.raw }),
+        },
+      }
+    }
+    return primary
+  }
   if (env.AI_PROVIDER === 'roboflow_workflow') {
     return verifyMangrovePlantVideoRoboflow(opts)
   }

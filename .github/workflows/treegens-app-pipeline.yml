@@ -1,0 +1,79 @@
+# Build and push treegens-app ML API image; optional SSH deploy when VPS is reachable.
+name: treegens-app-pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'treegens-app/**'
+      - '.github/workflows/treegens-app-pipeline.yml'
+
+env:
+  ML_DIR: treegens-app
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test deps
+        working-directory: ${{ env.ML_DIR }}/server
+        run: |
+          pip install pydantic pydantic-settings numpy opencv-python-headless pytest
+          pip install -e . 2>/dev/null || true
+      - name: Run dedupe unit tests
+        working-directory: ${{ env.ML_DIR }}/server
+        run: |
+          export PYTHONPATH=.
+          pytest tests/test_dedupe.py -q
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push ML API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.ML_DIR }}/server
+          file: ${{ env.ML_DIR }}/server/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/treegens-planting-api:main
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-ml:
+    needs: publish
+    if: ${{ secrets.PROD_HOST != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy ML API on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        continue-on-error: true
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USERNAME }}
+          key: ${{ secrets.PROD_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            cd treegens-app || cd /root/treegens-app
+            git pull origin main || true
+            docker compose pull api 2>/dev/null || docker compose build api
+            export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
+            docker compose up -d api
+            curl -sf http://127.0.0.1:8000/health

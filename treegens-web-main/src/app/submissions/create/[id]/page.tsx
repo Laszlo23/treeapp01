@@ -1,6 +1,7 @@
 'use client'
 
 import UploadProgressModal from '@/components/Modals/UploadProgressModal'
+import { SubmissionCompleteCelebration } from '@/components/submission/SubmissionCompleteCelebration'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useConnectivity } from '@/contexts/ConnectivityProvider'
@@ -9,12 +10,19 @@ import { type ReverseGeocodeResult } from '@/services/geocodingService'
 import { offlineVideoService } from '@/services/offlineVideoService'
 import { isValidSubmissionObjectId } from '@/services/submissionApiMappers'
 import { videoService, VideoType } from '@/services/videoService'
-import type { ISubmissionDoc } from '@/types'
+import type { ISubmissionAiVerification, ISubmissionDoc } from '@/types'
 import { submissionDocToPlanterGroup } from '@/utils/submissionPlanterGroup'
 import { validateVideoFile } from '@/utils/videoValidation'
 import { getSubmissionDetailVideoUrl } from '@/utils/submissionDetailVideo'
 import { useParams, useRouter } from 'next/navigation'
-import { type DragEvent, useEffect, useMemo, useState } from 'react'
+import {
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import toast from 'react-hot-toast'
 import { HiArrowLeft } from 'react-icons/hi2'
 import { IoVideocamOutline } from 'react-icons/io5'
@@ -59,6 +67,18 @@ export default function CompleteSubmissionPage() {
     durationMs?: number
   }>({})
 
+  const [plantAiAfterUpload, setPlantAiAfterUpload] =
+    useState<ISubmissionAiVerification | null>(null)
+  const [mangroveUploadAwaitingContinue, setMangroveUploadAwaitingContinue] =
+    useState(false)
+  const [showSubmissionCelebrate, setShowSubmissionCelebrate] = useState(false)
+  const [celebrationVariant, setCelebrationVariant] = useState<
+    'submitted' | 'queued'
+  >('submitted')
+  const [celebrationOfflineMangrove, setCelebrationOfflineMangrove] =
+    useState(false)
+  const postCelebrateHrefRef = useRef<string | null>(null)
+
   const resolvedTreeType = useMemo(() => {
     if (mangroveAnswer === 'yes') return 'mangrove'
     if (mangroveAnswer === 'no') return treeType.trim()
@@ -86,6 +106,28 @@ export default function CompleteSubmissionPage() {
     resolvedTreeType,
     treesPlanted,
   ])
+
+  const dismissSubmissionCelebrate = useCallback(() => {
+    setShowSubmissionCelebrate(false)
+    setPlantAiAfterUpload(null)
+    setCelebrationOfflineMangrove(false)
+    const href = postCelebrateHrefRef.current
+    postCelebrateHrefRef.current = null
+    if (href) {
+      router.push(href)
+      router.refresh()
+    }
+  }, [router])
+
+  const finishMangroveUploadModalAndCelebrate = useCallback(() => {
+    setMangroveUploadAwaitingContinue(false)
+    setShowUploadModal(false)
+    setCelebrationVariant('submitted')
+    setCelebrationOfflineMangrove(false)
+    postCelebrateHrefRef.current = `/submissions/${encodeURIComponent(submissionId)}`
+    setShowSubmissionCelebrate(true)
+    toast.success('Submission complete')
+  }, [submissionId])
 
   useEffect(() => {
     const load = async () => {
@@ -188,10 +230,16 @@ export default function CompleteSubmissionPage() {
         }
       : undefined
 
+    const submissionDetailHref = `/submissions/${encodeURIComponent(submissionId)}`
+    const isMangrove = resolvedTreeType.toLowerCase() === 'mangrove'
+    let uploadedPlantAi: ISubmissionAiVerification | null = null
+
     try {
       if (isUserOnline) {
         setIsUploading(true)
-        await videoService.uploadVideo(
+        setPlantAiAfterUpload(null)
+        setMangroveUploadAwaitingContinue(false)
+        const uploadRes = await videoService.uploadVideo(
           plantFile,
           VideoType.PLANT,
           latitude,
@@ -218,6 +266,8 @@ export default function CompleteSubmissionPage() {
             onUploadProgress: percent => setUploadProgress(percent),
           },
         )
+        uploadedPlantAi = uploadRes?.data?.aiVerification ?? null
+        setPlantAiAfterUpload(uploadedPlantAi)
       } else {
         setIsQueueing(true)
         await offlineVideoService.queueVideoUpload(
@@ -248,12 +298,51 @@ export default function CompleteSubmissionPage() {
       setUploadProgress(100)
       setUploadSuccess(true)
       clearPlantVideo()
+
+      if (isUserOnline && isMangrove) {
+        setMangroveUploadAwaitingContinue(false)
+        setShowUploadModal(false)
+        setCelebrationVariant('submitted')
+        setCelebrationOfflineMangrove(false)
+        postCelebrateHrefRef.current = submissionDetailHref
+        setShowSubmissionCelebrate(true)
+        const counted = uploadedPlantAi?.countedMangroves
+        if (
+          uploadedPlantAi?.status === 'completed' &&
+          typeof counted === 'number'
+        ) {
+          toast.success(
+            `AI counted ${counted} mangrove seedling${counted === 1 ? '' : 's'} in your video`,
+          )
+        } else if (uploadedPlantAi?.status === 'failed') {
+          toast.error(
+            uploadedPlantAi.error?.trim() ||
+              'AI count failed — a verifier will review your video.',
+          )
+        } else {
+          toast.success('Plant video uploaded')
+        }
+        return
+      }
+
+      if (!isUserOnline && isMangrove) {
+        setShowUploadModal(false)
+        setPlantAiAfterUpload(null)
+        setCelebrationVariant('queued')
+        setCelebrationOfflineMangrove(true)
+        postCelebrateHrefRef.current = submissionDetailHref
+        setShowSubmissionCelebrate(true)
+        toast.success(
+          'Submission queued. It will upload when you are back online.',
+        )
+        return
+      }
+
       toast.success(
         isUserOnline
           ? 'Submission complete'
           : 'Submission queued. It will upload when you are back online.',
       )
-      const submissionDetailHref = `/submissions/${encodeURIComponent(submissionId)}`
       setShowUploadModal(false)
       router.push(submissionDetailHref)
       router.refresh()
@@ -263,6 +352,8 @@ export default function CompleteSubmissionPage() {
         : 'Failed to queue plant video. Please try again.'
       setUploadError(msg)
       toast.error(msg)
+      setMangroveUploadAwaitingContinue(false)
+      setPlantAiAfterUpload(null)
       console.error('Complete submission failed', e)
     } finally {
       setIsUploading(false)
@@ -287,11 +378,24 @@ export default function CompleteSubmissionPage() {
         upload={{
           progress: uploadProgress,
           message: isUserOnline
-            ? 'Uploading video…'
+            ? mangroveUploadAwaitingContinue
+              ? 'Upload complete · review AI count below'
+              : 'Uploading video…'
             : 'Video will be uploaded when online',
           success: uploadSuccess,
           error: uploadError || undefined,
         }}
+        plantAiVerification={plantAiAfterUpload}
+        awaitingMangroveAiContinue={mangroveUploadAwaitingContinue}
+        onContinueAfterMangroveAi={finishMangroveUploadModalAndCelebrate}
+      />
+
+      <SubmissionCompleteCelebration
+        open={showSubmissionCelebrate}
+        onFinished={dismissSubmissionCelebrate}
+        variant={celebrationVariant}
+        mangrovePlantAi={plantAiAfterUpload}
+        queuedOfflineMangrove={celebrationOfflineMangrove}
       />
 
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-2">

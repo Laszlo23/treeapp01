@@ -30,11 +30,13 @@ function sniffContentType(absPath: string): string {
 }
 
 async function main() {
-  console.log(
-    'AI_PROVIDER:',
-    env.AI_PROVIDER,
-    env.AI_PROVIDER === 'roboflow_workflow' ? '(Roboflow)' : '(Ultralytics-style)',
-  )
+  const providerLabel =
+    env.AI_PROVIDER === 'roboflow_workflow'
+      ? '(Roboflow)'
+      : env.AI_PROVIDER === 'treegens_ml'
+        ? '(self-hosted YOLO /internal/verify-video)'
+        : '(Ultralytics-style)'
+  console.log('AI_PROVIDER:', env.AI_PROVIDER, providerLabel)
   console.log(
     'AI_ULTRALYTICS_INPUT_MODE:',
     env.AI_ULTRALYTICS_INPUT_MODE,

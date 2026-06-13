@@ -9,7 +9,7 @@ import VideoModal from '@/components/Modals/VideoModal'
 import { ClipStatusPill } from '@/components/ClipStatusPill'
 import { SubmissionStatusBadges } from '@/components/submission-detail/SubmissionStatusBadges'
 import { VideoType } from '@/services/videoService'
-import { IVideo } from '@/types'
+import type { ISubmissionAiVerification, IVideo } from '@/types'
 import { ipfsGatewayUrl } from '@/utils/ipfsGatewayUrl'
 import type { PlanterSubmissionBadge } from '@/utils/planterSubmissionBadge'
 import { formatTimeAgo } from '@/utils/timeAgo'
@@ -21,6 +21,8 @@ export interface SubmissionCardProps {
   status?: string
   statusMeta?: PlanterSubmissionBadge | null
   rewardClaimDisplay?: boolean | null
+  /** Mangrove plant clip: show AI seedling count when available */
+  aiVerification?: ISubmissionAiVerification
 }
 
 function formatTreeCount(n: number): string {
@@ -36,6 +38,7 @@ export default function SubmissionCard({
   status,
   statusMeta = null,
   rewardClaimDisplay = null,
+  aiVerification,
 }: SubmissionCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isVideoLoading, setIsVideoLoading] = useState(false)
@@ -49,6 +52,14 @@ export default function SubmissionCard({
       ? formatTreeCount(Math.max(0, Math.floor(Number(video.treesPlanted))))
       : null
   const speciesLabel = video.treetype?.trim() || ''
+  const aiCounted =
+    isPlantClip &&
+    speciesLabel.toLowerCase() === 'mangrove' &&
+    aiVerification?.status === 'completed' &&
+    typeof aiVerification.countedMangroves === 'number' &&
+    Number.isFinite(aiVerification.countedMangroves)
+      ? Math.max(0, Math.floor(aiVerification.countedMangroves))
+      : null
 
   const locationText =
     video.reverseGeocode ||
@@ -94,6 +105,13 @@ export default function SubmissionCard({
                     : 'Trees planted'}
                 </span>
               </div>
+              {aiCounted != null ? (
+                <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-200">
+                  AI counted{' '}
+                  <span className="tabular-nums text-white">{aiCounted}</span>{' '}
+                  in video
+                </p>
+              ) : null}
               <p className="mt-1 text-lg font-black tabular-nums leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]">
                 {treeCountDisplay != null ? (
                   <>

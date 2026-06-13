@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-treegens_planting}
+    volumes:
+      - planting_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-dev-key}
+      MODEL_PATH: /models/best.pt
+      MODEL_VERSION: ${MODEL_VERSION:-yolo11-obb-v1}
+      VIDEO_SAMPLE_FRAMES: ${VIDEO_SAMPLE_FRAMES:-48}
+      VIDEO_SAMPLE_INTERVAL_SECONDS: ${VIDEO_SAMPLE_INTERVAL_SECONDS:-0.5}
+      DEDUPE_CENTER_DISTANCE: ${DEDUPE_CENTER_DISTANCE:-0.079}
+      SHORT_CLIP_MAX_DURATION_SECONDS: ${SHORT_CLIP_MAX_DURATION_SECONDS:-10}
+      SHORT_CLIP_DEDUPE_CENTER_DISTANCE: ${SHORT_CLIP_DEDUPE_CENTER_DISTANCE:-0.11}
+      MIN_TREE_CONFIDENCE: ${MIN_TREE_CONFIDENCE:-0.24}
+      YOLO_IMGSZ: ${YOLO_IMGSZ:-960}
+      YOLO_PREDICT_CONF: ${YOLO_PREDICT_CONF:-0.01}
+      CLAIM_COUNT_MAX_DELTA: ${CLAIM_COUNT_MAX_DELTA:-2}
+    volumes:
+      - ./models:/models:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+volumes:
+  planting_pg_data:

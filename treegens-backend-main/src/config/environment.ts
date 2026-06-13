@@ -219,14 +219,48 @@ class EnvironmentConfig {
   }
 
   /**
-   * `ultralytics` — multipart Bearer call to `AI_API_BASE_URL` + `AI_API_VERIFY_PATH` (default).
-   * `roboflow_workflow` — JSON workflow call to Roboflow Serverless (`ROBOFLOW_*` settings).
+   * `treegens_ml` — self-hosted FastAPI YOLO verifier (`PLANTING_VERIFICATION_*`, no Roboflow).
+   * `ultralytics` — multipart Bearer call to `AI_API_PREDICT_URL` or base + path.
+   * `roboflow_workflow` — Roboflow Serverless (`ROBOFLOW_*` settings).
    */
-  get AI_PROVIDER() {
-    const v = (process.env.AI_PROVIDER || 'ultralytics').trim().toLowerCase()
+  get AI_PROVIDER():
+    | 'treegens_ml'
+    | 'ultralytics'
+    | 'roboflow_workflow' {
+    const v = (process.env.AI_PROVIDER || 'treegens_ml').trim().toLowerCase()
     if (v === 'roboflow_workflow' || v === 'roboflow')
       return 'roboflow_workflow'
+    if (
+      v === 'treegens_ml' ||
+      v === 'planting_api' ||
+      v === 'local_ml' ||
+      v === 'yolo'
+    ) {
+      return 'treegens_ml'
+    }
     return 'ultralytics'
+  }
+
+  /** Base URL for self-hosted planting verifier, e.g. `http://127.0.0.1:8000`. */
+  get PLANTING_VERIFICATION_API_URL() {
+    return (process.env.PLANTING_VERIFICATION_API_URL || '').trim()
+  }
+
+  /**
+   * Shared secret for `POST /internal/verify-video` (`X-Internal-Key`).
+   * Must match FastAPI `INTERNAL_API_KEY` on the planting service.
+   */
+  get PLANTING_VERIFICATION_INTERNAL_KEY() {
+    return process.env.PLANTING_VERIFICATION_INTERNAL_KEY || ''
+  }
+
+  /**
+   * When true and `AI_PROVIDER=treegens_ml`, retry with Ultralytics `/predict` if the
+   * planting API times out or returns 5xx.
+   */
+  get AI_FAILOVER_TO_ULTRALYTICS() {
+    const v = (process.env.AI_FAILOVER_TO_ULTRALYTICS || '').trim().toLowerCase()
+    return v === '1' || v === 'true' || v === 'yes'
   }
 
   /** Mangrove AI verification API (Building Culture). All optional — if unset, plant uploads skip AI. */
@@ -388,6 +422,38 @@ class EnvironmentConfig {
     const raw = process.env.AI_RAW_RESPONSE_MAX_CHARS
     const n = raw !== undefined && raw !== '' ? parseInt(raw, 10) : 16_384
     return Number.isNaN(n) || n < 1024 ? 16_384 : Math.min(n, 256_000)
+  }
+
+  /**
+   * When `detections[]` includes boxes, merge overlaps with this IoU threshold (0–1).
+   * Lower values merge more aggressively (fewer double-counts, risk of under-counting).
+   */
+  get AI_DETECTION_NMS_IOU() {
+    const raw = process.env.AI_DETECTION_NMS_IOU
+    const n = raw !== undefined && raw !== '' ? parseFloat(String(raw)) : 0.32
+    if (Number.isNaN(n) || n <= 0 || n > 1) return 0.32
+    return n
+  }
+
+  /**
+   * Drop boxes whose area exceeds this fraction of inferred frame area (strips full-frame FPs).
+   * Typical frame inferred from max x2/y2 across detections.
+   */
+  get AI_DETECTION_MAX_BOX_AREA_FRACTION() {
+    const raw = process.env.AI_DETECTION_MAX_BOX_AREA_FRACTION
+    const n = raw !== undefined && raw !== '' ? parseFloat(String(raw)) : 0.22
+    if (Number.isNaN(n) || n <= 0 || n > 1) return 0.22
+    return n
+  }
+
+  /**
+   * Minimum per-detection confidence before NMS (when the field exists). Set to 0 to disable.
+   */
+  get AI_DETECTION_MIN_CONFIDENCE() {
+    const raw = process.env.AI_DETECTION_MIN_CONFIDENCE
+    const n = raw !== undefined && raw !== '' ? parseFloat(String(raw)) : 0.88
+    if (Number.isNaN(n) || n < 0 || n > 1) return 0.88
+    return n
   }
 
   // --- Roboflow Serverless workflows (when AI_PROVIDER=roboflow_workflow) ---

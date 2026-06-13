@@ -273,7 +273,9 @@ class SubmissionService {
       provider:
         env.AI_PROVIDER === 'roboflow_workflow'
           ? 'roboflow_workflow'
-          : 'ultralytics',
+          : env.AI_PROVIDER === 'treegens_ml'
+            ? 'treegens_ml'
+            : 'ultralytics',
       walletAddress: userWalletAddress,
       ...(Number.isFinite(latitude) && Number.isFinite(longitude)
         ? {
