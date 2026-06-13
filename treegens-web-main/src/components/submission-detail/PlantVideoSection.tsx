@@ -41,18 +41,18 @@ export function PlantVideoSection({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-row items-center justify-between gap-1">
-        <h2 className="text-lg font-bold text-gray-900">Plant</h2>
+        <h2 className="text-lg font-bold text-gray-900">After planting</h2>
       </div>
       {!plantVideo ? (
         <div className="flex flex-col items-center">
           <p className="text-center text-lg text-gray-600">
-            No plant video uploaded yet for this submission.
+            No after video uploaded yet. Film the planted area and upload it here.
           </p>
           <Link
             href={completeHref}
             className="mt-2 rounded-full bg-lime-green-2 px-3 py-2 text-base font-semibold text-brown-3"
           >
-            Complete submission
+            Upload after video
           </Link>
         </div>
       ) : (

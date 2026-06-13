@@ -31,6 +31,9 @@ jobs:
       - name: TypeScript build
         working-directory: ${{ env.BACKEND_DIR }}
         run: yarn build
+      - name: Unit tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: yarn test
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx

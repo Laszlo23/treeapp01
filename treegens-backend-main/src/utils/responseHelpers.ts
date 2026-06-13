@@ -7,7 +7,9 @@ const sendSuccess = (
   statusCode: number = 200,
 ) => {
   const response: { message: string; data?: any } = { message }
-  if (data) response.data = data
+  // Include payloads like `0`, `false`, or `{ pointsTotal: 0, tasks: [] }`
+  // (`if (data)` incorrectly dropped valid objects when only some fields are set).
+  if (data !== undefined && data !== null) response.data = data
   return res.status(statusCode).json(response)
 }
 

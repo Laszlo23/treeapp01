@@ -11,7 +11,8 @@ type Props = {
 export function LandVideoSection({ videoUrl, locationText, timeAgo }: Props) {
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-lg font-bold text-gray-900">Land</h2>
+      <h2 className="text-lg font-bold text-gray-900">Before planting</h2>
+      <p className="text-sm text-gray-500">Land video filmed before trees were planted</p>
       <div className="overflow-hidden rounded-2xl bg-[#f3f4f6]">
         {videoUrl ? (
           <video

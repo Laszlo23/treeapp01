@@ -34,7 +34,15 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
   if (authLoading || (!isAuthenticated && !isPublicPage)) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen tg-page-bg">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-green-1"></div>
+      </div>
+    )
+  }
+
+  if (isLoginPage && isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen tg-page-bg">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-green-1"></div>
       </div>
     )

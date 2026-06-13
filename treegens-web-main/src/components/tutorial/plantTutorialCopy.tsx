@@ -152,13 +152,15 @@ export const verifyInstructions: Record<'English' | 'Swahili', ReactNode> = {
       <div className="flex flex-col gap-2">
         <h3>
           <span className="font-bold">Step 1{`)`}</span> Before planting, film
-          the land you will be planting.
+          the land you will be planting. This is your <strong>before</strong>{' '}
+          video.
         </h3>
       </div>
       <div className="flex flex-col gap-2">
         <h3>
           <span className="font-bold">Step 2{`)`}</span> After planting, film
-          in <strong>one continual direction only</strong>—either left to right{' '}
+          your <strong>after</strong> video in{' '}
+          <strong>one continual direction only</strong>—either left to right{' '}
           <em>or</em> right to left for the whole clip (not both, and don’t scan
           back and forth). The same idea applies vertically (e.g. only upward or
           only downward). For example, do not pan left‑to‑right and then reverse.
@@ -182,13 +184,15 @@ export const verifyInstructions: Record<'English' | 'Swahili', ReactNode> = {
       <div className="flex flex-col gap-2">
         <h3>
           <span className="font-bold">Hatua ya 1{')'}</span> Kabla ya kupanda,
-          chukua video ya eneo utakalopanda.
+          chukua video ya eneo utakalopanda. Hii ni video yako ya{' '}
+          <strong>kabla</strong>.
         </h3>
       </div>
       <div className="flex flex-col gap-2">
         <h3>
           <span className="font-bold">Hatua ya 2{')'}</span> Baada ya kupanda,
-          chukua video ya mbegu ulizopanda kwa mwelekeo mmoja, mfano kutoka
+          chukua video yako ya <strong>baada</strong> kwa mwelekeo mmoja, mfano
+          kutoka
           kushoto kwenda kulia au kutoka juu kwenda chini. Kwa mfano, usirudi
           kushoto, kisha kulia na kisha kushoto tena. Ikiwa mbegu ya mikoko
           itatoka nje ya skrini na kisha kurudi, itahesabiwa mara mbili na

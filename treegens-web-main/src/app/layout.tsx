@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from '@/components/AuthGuard'
 import { MobileAppShell } from '@/components/Layout/MobileAppShell'
+import { DesktopMobileOnlyGate } from '@/components/Layout/DesktopMobileOnlyGate'
 import { SiteJsonLd } from '@/components/seo/SiteJsonLd'
 import { ThirdwebAutoConnect } from '@/components/providers/ThirdwebAutoConnect'
 import { TreeGensThirdwebProvider } from '@/components/providers/TreeGensThirdwebProvider'
@@ -99,9 +100,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
                   <AuthGuard>
                     <PWAInstaller />
                     <MobileAppShell>{children}</MobileAppShell>
-                    <div className="fixed inset-0 hidden items-center justify-center md:flex">
-                      You can see the app only on mobile
-                    </div>
+                    <DesktopMobileOnlyGate />
                   </AuthGuard>
                 </NotificationProvider>
               </UserProvider>

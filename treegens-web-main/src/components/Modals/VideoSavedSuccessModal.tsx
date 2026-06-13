@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button'
 interface VideoSavedSuccessModalProps {
   isOpen: boolean
   onClose: () => void
+  onDone: () => void
   locationInfo?: {
     hasValidLocation: boolean
     formatLocation: () => string
@@ -13,43 +14,42 @@ interface VideoSavedSuccessModalProps {
 export default function VideoSavedSuccessModal({
   isOpen,
   onClose,
+  onDone,
   locationInfo,
 }: VideoSavedSuccessModalProps) {
-  const handleDone = () => {
-    onClose()
-  }
-
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="relative w-full max-w-md mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+      <div className="relative mx-auto w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="px-6 py-9">
           <div className="flex flex-col items-center gap-6 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-2">
-              <span className="text-3xl">🌱</span>
+            <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <span className="text-3xl" aria-hidden>
+                🌱
+              </span>
             </div>
 
             <h3 className="text-2xl font-bold text-gray-900">
-              Video Saved. Now go plant some trees!
+              Before video saved
             </h3>
 
             <p className="text-lg font-semibold text-gray-700">
-              Your video will be reviewed by verifiers once you submit a second
-              video with trees planted.
+              Go plant your trees in the field, then come back for the after
+              video.
             </p>
 
-            {locationInfo?.hasValidLocation && (
-              <div className="w-full p-4 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-700 space-y-1">
+            {locationInfo?.hasValidLocation ? (
+              <div className="w-full rounded-lg bg-gray-50 p-4">
+                <div className="space-y-1 text-sm text-gray-700">
                   <p className="flex items-center justify-center gap-2">
-                    <span>📍</span>
+                    <span aria-hidden>📍</span>
                     <span>
                       Location recorded: {locationInfo.formatLocation()}
                     </span>
                   </p>
                   <p className="flex items-center justify-center gap-2">
-                    <span>🎯</span>
+                    <span aria-hidden>🎯</span>
                     <span>
                       Accuracy: ±
                       {locationInfo.accuracy
@@ -60,16 +60,23 @@ export default function VideoSavedSuccessModal({
                   </p>
                 </div>
               </div>
-            )}
+            ) : null}
 
             <Button
-              onClick={handleDone}
+              onClick={onDone}
               className="w-full bg-green-600 hover:bg-green-700 focus:ring-green-300"
               pill
               size="lg"
             >
-              <span className="font-semibold">Done</span>
+              <span className="font-semibold">Continue to after video</span>
             </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-sm font-medium text-gray-500 underline"
+            >
+              Stay on this page
+            </button>
           </div>
         </div>
       </div>

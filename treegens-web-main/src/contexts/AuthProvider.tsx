@@ -25,6 +25,7 @@ import {
 } from 'thirdweb/react'
 import { defaultChain } from '@/config/thirdwebChain'
 import { AuthService } from '../services/authService'
+import { apiErrorMessage } from '@/utils/apiErrorMessage'
 import { useConnectivity } from './ConnectivityProvider'
 
 // Authentication context types
@@ -143,7 +144,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         error instanceof Error
           ? error.message
           : 'Authentication failed. Please try again.'
-      toast.error(backendMessage || fallbackMessage)
+      const msg =
+        typeof backendMessage === 'string' && backendMessage.trim()
+          ? backendMessage.trim()
+          : apiErrorMessage(error, fallbackMessage)
+      toast.error(msg)
       setIsAuthenticated(false)
       setToken(null)
       return false

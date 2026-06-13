@@ -75,7 +75,7 @@ export default function HomePage() {
       setMyPlantsLoading(true)
       try {
         const { data } = await getMySubmissions({ page: 1, limit: 100 })
-        const docs = (data.data.submissions || []) as Array<
+        const docs = (data?.data?.submissions ?? []) as Array<
           ISubmissionDoc & Record<string, unknown>
         >
         setMyPlantGroups(docs.map(doc => submissionDocToPlanterGroup(doc)))
@@ -104,7 +104,7 @@ export default function HomePage() {
         approvedIds.map(async id => {
           try {
             const rs = await getRewardStatus(id)
-            return [id, rewardScheduleFullyClaimed(rs.data.data)] as const
+            return [id, rewardScheduleFullyClaimed(rs.data?.data)] as const
           } catch (e) {
             if (axios.isAxiosError(e) && e.response?.status === 404) {
               return [id, null] as const
@@ -154,7 +154,7 @@ export default function HomePage() {
       setHcLoading(true)
       try {
         const { data } = await listHealthCheckModeration(1, 3)
-        const filtered = (data.data.healthChecks || []).filter(
+        const filtered = (data?.data?.healthChecks ?? []).filter(
           hc => !hasVerifierVotedOnHealthCheck(hc, user?.walletAddress),
         )
         setHcPreview(filtered)
@@ -367,12 +367,23 @@ export default function HomePage() {
               {latestSubmissions.map(group => {
                 const clip = primaryVideoFromGroup(group)
                 if (!clip) return null
+                const awaitingPlant =
+                  group.submissionStatus === 'awaiting_plant' ||
+                  !group.plantVideo
                 return (
                   <SubmissionCard
                     key={group.submissionId}
                     video={clip}
                     detailHref={`${appConfig.routes.MySubmissions}/${encodeURIComponent(group.submissionId)}`}
                     statusMeta={getPlanterSubmissionBadge(group)}
+                    aiVerification={group.aiVerification}
+                    treeSpecies={group.submissionTreeSpecies}
+                    awaitingPlantClip={awaitingPlant && !!group.landVideo}
+                    completePlantHref={
+                      awaitingPlant
+                        ? `/submissions/create/${encodeURIComponent(group.submissionId)}`
+                        : undefined
+                    }
                     rewardClaimDisplay={
                       typeof rewardClaimedById[group.submissionId] === 'boolean'
                         ? rewardClaimedById[group.submissionId]

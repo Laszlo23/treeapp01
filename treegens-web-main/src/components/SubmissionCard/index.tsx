@@ -23,6 +23,12 @@ export interface SubmissionCardProps {
   rewardClaimDisplay?: boolean | null
   /** Mangrove plant clip: show AI seedling count when available */
   aiVerification?: ISubmissionAiVerification
+  /** Fallback species when clip mapper missed treeType (e.g. land-only preview) */
+  treeSpecies?: string
+  /** When land is uploaded but plant clip is missing */
+  awaitingPlantClip?: boolean
+  /** Link to finish step 2 (plant video) */
+  completePlantHref?: string
 }
 
 function formatTreeCount(n: number): string {
@@ -39,6 +45,9 @@ export default function SubmissionCard({
   statusMeta = null,
   rewardClaimDisplay = null,
   aiVerification,
+  treeSpecies,
+  awaitingPlantClip = false,
+  completePlantHref,
 }: SubmissionCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isVideoLoading, setIsVideoLoading] = useState(false)
@@ -51,15 +60,16 @@ export default function SubmissionCard({
     video.treesPlanted != null && Number.isFinite(Number(video.treesPlanted))
       ? formatTreeCount(Math.max(0, Math.floor(Number(video.treesPlanted))))
       : null
-  const speciesLabel = video.treetype?.trim() || ''
+  const speciesLabel = (video.treetype?.trim() || treeSpecies?.trim() || '')
+  const isMangroveSpecies = speciesLabel.toLowerCase() === 'mangrove'
   const aiCounted =
-    isPlantClip &&
-    speciesLabel.toLowerCase() === 'mangrove' &&
+    isMangroveSpecies &&
     aiVerification?.status === 'completed' &&
     typeof aiVerification.countedMangroves === 'number' &&
     Number.isFinite(aiVerification.countedMangroves)
       ? Math.max(0, Math.floor(aiVerification.countedMangroves))
       : null
+  const showPlantOverlay = isPlantClip || awaitingPlantClip
 
   const locationText =
     video.reverseGeocode ||
@@ -95,43 +105,73 @@ export default function SubmissionCard({
             Your browser does not support the video tag.
           </video>
 
-          {isPlantClip ? (
+          {showPlantOverlay ? (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] flex flex-col bg-gradient-to-t from-black/92 via-black/55 to-transparent px-3 pb-3 pt-14">
-              <div className="flex items-center gap-1.5">
-                <Image src="/img/tree.svg" alt="" width={16} height={16} />
-                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200/95">
-                  {speciesLabel.toLowerCase() === 'mangrove'
-                    ? 'Mangroves declared'
-                    : 'Trees planted'}
-                </span>
-              </div>
-              {aiCounted != null ? (
-                <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-200">
-                  AI counted{' '}
-                  <span className="tabular-nums text-white">{aiCounted}</span>{' '}
-                  in video
-                </p>
-              ) : null}
-              <p className="mt-1 text-lg font-black tabular-nums leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]">
-                {treeCountDisplay != null ? (
-                  <>
-                    {treeCountDisplay}
-                    {speciesLabel ? (
-                      <span className="ml-1.5 text-sm font-bold capitalize text-emerald-100/95">
-                        {speciesLabel}
-                      </span>
+              {awaitingPlantClip ? (
+                <>
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200/95">
+                    After video needed
+                  </span>
+                  <p className="mt-1 text-sm font-bold leading-snug text-white">
+                    {isMangroveSpecies
+                      ? 'Upload after video for AI count'
+                      : 'Upload after video to finish'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <Image src="/img/tree.svg" alt="" width={16} height={16} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200/95">
+                      {isMangroveSpecies
+                        ? 'Mangroves declared'
+                        : 'Trees planted'}
+                    </span>
+                  </div>
+                  {aiCounted != null ? (
+                    <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wide text-sky-200">
+                      AI counted{' '}
+                      <span className="tabular-nums text-white">{aiCounted}</span>{' '}
+                      in video
+                    </p>
+                  ) : isMangroveSpecies && aiVerification?.status === 'processing' ? (
+                    <p className="mt-1.5 text-[11px] font-semibold text-sky-200">
+                      AI counting…
+                    </p>
+                  ) : isMangroveSpecies && aiVerification?.status === 'failed' ? (
+                    <p className="mt-1.5 text-[11px] font-semibold text-amber-200">
+                      AI count pending review
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-lg font-black tabular-nums leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)]">
+                    {aiCounted != null ? (
+                      <>
+                        <span className="text-2xl">{aiCounted}</span>
+                        <span className="ml-1.5 text-sm font-bold capitalize text-emerald-100/95">
+                          AI counted
+                        </span>
+                      </>
+                    ) : treeCountDisplay != null ? (
+                      <>
+                        {treeCountDisplay}
+                        {speciesLabel ? (
+                          <span className="ml-1.5 text-sm font-bold capitalize text-emerald-100/95">
+                            {speciesLabel}
+                          </span>
+                        ) : (
+                          <span className="ml-1.5 text-sm font-semibold text-emerald-100/95">
+                            trees
+                          </span>
+                        )}
+                      </>
                     ) : (
-                      <span className="ml-1.5 text-sm font-semibold text-emerald-100/95">
-                        trees
+                      <span className="text-sm font-semibold text-emerald-100/90">
+                        {speciesLabel || 'Open submission for count'}
                       </span>
                     )}
-                  </>
-                ) : (
-                  <span className="text-sm font-semibold text-emerald-100/90">
-                    {speciesLabel || 'Open submission for count'}
-                  </span>
-                )}
-              </p>
+                  </p>
+                </>
+              )}
             </div>
           ) : null}
 
@@ -166,6 +206,15 @@ export default function SubmissionCard({
       <div className="mt-2 flex flex-row items-start justify-between gap-2 px-0.5">
         <div className="min-w-0 max-w-[70%] flex-1">
           <p className="text-xs font-semibold text-[#1a1510]">{timestamp}</p>
+          {awaitingPlantClip && completePlantHref ? (
+            <Link
+              href={completePlantHref}
+              className="mt-1 inline-block text-xs font-semibold text-tree-green-2 underline"
+              onClick={e => e.stopPropagation()}
+            >
+              Finish after video →
+            </Link>
+          ) : null}
           {video.reverseGeocode ? (
             <Tooltip content={<span>{video.reverseGeocode}</span>}>
               <p className="truncate text-xs text-[#5c534a] underline">
@@ -192,8 +241,15 @@ export default function SubmissionCard({
 
   return (
     <>
-      {detailHref ? (
-        <Link href={detailHref} className={`${cardClassName} block`}>
+      {detailHref || completePlantHref ? (
+        <Link
+          href={
+            awaitingPlantClip && completePlantHref
+              ? completePlantHref
+              : (detailHref as string)
+          }
+          className={`${cardClassName} block`}
+        >
           {mediaBlock}
         </Link>
       ) : (

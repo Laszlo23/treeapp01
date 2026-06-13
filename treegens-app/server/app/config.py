@@ -17,16 +17,16 @@ class Settings(BaseSettings):
 
     video_sample_frames: int = Field(default=48, ge=1, alias="VIDEO_SAMPLE_FRAMES")
     video_sample_interval_seconds: float = Field(
-        default=0.5,
+        default=0.4,
         gt=0,
         alias="VIDEO_SAMPLE_INTERVAL_SECONDS",
         description="Target seconds between sampled frames; count is min(frames_cap, duration/interval).",
     )
     video_max_duration_seconds: float = Field(default=120.0, gt=0, alias="VIDEO_MAX_DURATION_SECONDS")
 
-    dedupe_center_distance: float = Field(default=0.079, gt=0, alias="DEDUPE_CENTER_DISTANCE")
+    dedupe_center_distance: float = Field(default=0.085, gt=0, alias="DEDUPE_CENTER_DISTANCE")
     short_clip_max_duration_seconds: float = Field(
-        default=10.0,
+        default=20.0,
         gt=0,
         alias="SHORT_CLIP_MAX_DURATION_SECONDS",
     )

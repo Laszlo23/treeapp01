@@ -3,7 +3,7 @@
  * Handles queuing videos for background sync when offline
  */
 
-import { apiBaseUrl } from '@/config/apiBaseUrl'
+import { getApiBaseUrl } from '@/config/apiBaseUrl'
 import { AuthService } from './authService'
 import {
   CompressionProgress,
@@ -542,7 +542,7 @@ export class OfflineVideoService {
   private async sendBaseURLToServiceWorker(): Promise<void> {
     try {
       await this.sendMessageToServiceWorker('SET_BASE_URL', {
-        baseURL: apiBaseUrl,
+        baseURL: getApiBaseUrl(),
       })
     } catch (error) {
       console.log(

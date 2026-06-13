@@ -11,9 +11,12 @@ import { IoVideocamOutline } from 'react-icons/io5'
 import { MdClose } from 'react-icons/md'
 import { guidelines } from '@/modules/createSubmission/guidelines'
 import UploadProgressModal from '@/components/Modals/UploadProgressModal'
+import VideoSavedSuccessModal from '@/components/Modals/VideoSavedSuccessModal'
+import { TwoVideoProofSteps } from '@/components/submission/TwoVideoProofSteps'
 import { SubmissionCompleteCelebration } from '@/components/submission/SubmissionCompleteCelebration'
 import { useConnectivity } from '@/contexts/ConnectivityProvider'
 import { useUser } from '@/contexts/UserProvider'
+import { getMySubmissions } from '@/services/app'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import type { ReverseGeocodeResult } from '@/services/geocodingService'
 import { reverseGeocode } from '@/services/geocodingService'
@@ -70,6 +73,10 @@ export default function NewPlant() {
   const [serverSubmissionId, setServerSubmissionId] = useState<string | null>(
     null,
   )
+  const [showLandSavedModal, setShowLandSavedModal] = useState(false)
+  const [pendingResumeSubmissionId, setPendingResumeSubmissionId] = useState<
+    string | null
+  >(null)
 
   // Plant video specific fields (aligned with mobile create submission)
   const [treesPlantedInput, setTreesPlantedInput] = useState<string>('1')
@@ -86,19 +93,21 @@ export default function NewPlant() {
     setCelebrationOfflineMangrove(false)
   }, [])
 
-  const finishMangroveUploadModalAndCelebrate = useCallback(() => {
+  const finishMangroveUploadModalAndCelebrate = useCallback(async () => {
     setMangroveUploadAwaitingContinue(false)
     setShowUploadModal(false)
     setCelebrationVariant('submitted')
     setCelebrationOfflineMangrove(false)
+    await refetchVideos()
     setShowSubmissionCelebrate(true)
     toast.success('Submission complete')
-  }, [])
+  }, [refetchVideos])
 
   // Use the custom hook instead of managing state manually
   const {
     latitude,
     longitude,
+    accuracy: locationAccuracy,
     loading: locationLoading,
     error: locationError,
     getCurrentPosition,
@@ -119,6 +128,38 @@ export default function NewPlant() {
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  /** Resume an in-progress draft (land uploaded, plant missing) instead of starting over. */
+  useEffect(() => {
+    if (!isMounted || !isUserOnline) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await getMySubmissions({ page: 1, limit: 20 })
+        const docs = (data?.data?.submissions ?? []) as Array<{
+          _id: string
+          status?: string
+          plant?: { uploaded?: boolean }
+        }>
+        const draft = docs.find(
+          d =>
+            d.status === 'awaiting_plant' &&
+            d.plant?.uploaded !== true,
+        )
+        if (!cancelled && draft?._id) {
+          sessionStorage.setItem('tg_resume_step2', '1')
+          router.replace(
+            `/submissions/create/${encodeURIComponent(String(draft._id))}`,
+          )
+        }
+      } catch (e) {
+        console.warn('Could not check for draft submissions', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isMounted, isUserOnline, router])
 
   // Get location when component mounts (only once and only on client)
   useEffect(() => {
@@ -178,6 +219,8 @@ export default function NewPlant() {
 
   const isLandStep = !hasUploadedLandVideo
   const isPlantStep = hasUploadedLandVideo
+  const isOfflineLandQueued =
+    isPlantStep && !isValidSubmissionObjectId(serverSubmissionId || '')
   const isFullySubmitted = false
 
   useEffect(() => {
@@ -422,10 +465,11 @@ export default function NewPlant() {
         setHasUploadedLandVideo(true)
         handleRemoveVideo(VideoType.LAND)
         await refetchVideos()
-        toast.success(
-          'Land video uploaded. Add planting details and record the plant video.',
-        )
+        toast.success('Before video saved.')
         setShowUploadModal(false)
+        setPendingResumeSubmissionId(sid)
+        setShowLandSavedModal(true)
+        return
       } else {
         resetCompressionProgress()
         setShowUploadModal(true)
@@ -528,17 +572,25 @@ export default function NewPlant() {
         await refetchVideos()
 
         if (isMangrove) {
+          const counted = ai?.countedMangroves
+          if (
+            ai?.status === 'completed' &&
+            typeof counted === 'number' &&
+            Number.isFinite(counted)
+          ) {
+            setMangroveUploadAwaitingContinue(true)
+            setUploadSuccess(true)
+            toast.success(
+              `AI counted ${counted} mangrove seedling${counted === 1 ? '' : 's'} in your video`,
+            )
+            return
+          }
           setMangroveUploadAwaitingContinue(false)
           setShowUploadModal(false)
           setCelebrationVariant('submitted')
           setCelebrationOfflineMangrove(false)
           setShowSubmissionCelebrate(true)
-          const counted = ai?.countedMangroves
-          if (ai?.status === 'completed' && typeof counted === 'number') {
-            toast.success(
-              `AI counted ${counted} mangrove seedling${counted === 1 ? '' : 's'} in your video`,
-            )
-          } else if (ai?.status === 'failed') {
+          if (ai?.status === 'failed') {
             toast.error(
               ai.error?.trim() ||
                 'AI count failed — a verifier will review your video.',
@@ -661,6 +713,11 @@ export default function NewPlant() {
           </div>
         </div>
 
+        <TwoVideoProofSteps
+          activeStep={isLandStep ? 1 : 3}
+          className="mb-6"
+        />
+
         <div className="mb-6 flex flex-row items-center justify-between gap-2">
           <div className="flex min-h-0 min-w-0 flex-1 flex-row items-center gap-2">
             <GrLocation
@@ -688,15 +745,27 @@ export default function NewPlant() {
           <p className="mb-4 text-sm text-red-600">{validationError}</p>
         ) : null}
 
-        {!isFullySubmitted && (isLandStep || isPlantStep) ? (
+        {isOfflineLandQueued ? (
+          <section className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4">
+            <p className="text-sm font-bold text-amber-950">
+              Before video queued for upload
+            </p>
+            <p className="mt-1 text-sm text-amber-900/90">
+              Come back online so your before video can upload. Then plant your
+              trees in the field and return here for the after video.
+            </p>
+          </section>
+        ) : null}
+
+        {!isFullySubmitted && (isLandStep || isPlantStep) && !isOfflineLandQueued ? (
           <section className="mb-6">
             <h2 className="mb-2 text-base font-semibold text-gray-800">
-              {isLandStep ? 'Land video' : 'Plant video'}
+              {isLandStep ? 'Before video (land)' : 'After video (planted area)'}
             </h2>
             <p className="mb-3 text-sm text-gray-500">
               {isLandStep
-                ? `Record the land area. Max ${MAX_VIDEO_DURATION} seconds.`
-                : `Record the planted area. Max ${MAX_VIDEO_DURATION} seconds.`}
+                ? `Film the empty land before planting. Clips up to ${MAX_VIDEO_DURATION} seconds are accepted.`
+                : `Film the same area after planting. Clips up to ${MAX_VIDEO_DURATION} seconds are accepted.`}
             </p>
             {isLandStep ? (
               landFile ? (
@@ -772,7 +841,7 @@ export default function NewPlant() {
           </section>
         ) : null}
 
-        {isPlantStep && !isFullySubmitted ? (
+        {isPlantStep && !isFullySubmitted && !isOfflineLandQueued ? (
           <section className="mb-6 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
             <h3 className="mb-3 text-base font-semibold text-gray-800">
               Planting details
@@ -888,7 +957,8 @@ export default function NewPlant() {
           </section>
         ) : null}
 
-        {(isLandStep || isPlantStep) && !isFullySubmitted ? (
+        {(isLandStep || (isPlantStep && !isOfflineLandQueued)) &&
+        !isFullySubmitted ? (
           <div className="mb-10">
             <Button
               type="button"
@@ -977,6 +1047,24 @@ export default function NewPlant() {
           </div>
         </div>
       ) : null}
+
+      <VideoSavedSuccessModal
+        isOpen={showLandSavedModal}
+        onClose={() => setShowLandSavedModal(false)}
+        onDone={() => {
+          setShowLandSavedModal(false)
+          const sid = pendingResumeSubmissionId
+          setPendingResumeSubmissionId(null)
+          if (sid?.trim()) {
+            router.push(`/submissions/create/${encodeURIComponent(sid)}`)
+          }
+        }}
+        locationInfo={{
+          hasValidLocation: hasValidLocation(),
+          formatLocation,
+          accuracy: locationAccuracy,
+        }}
+      />
 
       <SubmissionCompleteCelebration
         open={showSubmissionCelebrate}

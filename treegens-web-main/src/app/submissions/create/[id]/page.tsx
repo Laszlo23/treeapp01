@@ -2,6 +2,7 @@
 
 import UploadProgressModal from '@/components/Modals/UploadProgressModal'
 import { SubmissionCompleteCelebration } from '@/components/submission/SubmissionCompleteCelebration'
+import { TwoVideoProofSteps } from '@/components/submission/TwoVideoProofSteps'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { useConnectivity } from '@/contexts/ConnectivityProvider'
@@ -12,6 +13,7 @@ import { isValidSubmissionObjectId } from '@/services/submissionApiMappers'
 import { videoService, VideoType } from '@/services/videoService'
 import type { ISubmissionAiVerification, ISubmissionDoc } from '@/types'
 import { submissionDocToPlanterGroup } from '@/utils/submissionPlanterGroup'
+import { VIDEO_CONFIG } from '@/utils/constants'
 import { validateVideoFile } from '@/utils/videoValidation'
 import { getSubmissionDetailVideoUrl } from '@/utils/submissionDetailVideo'
 import { useParams, useRouter } from 'next/navigation'
@@ -45,7 +47,7 @@ export default function CompleteSubmissionPage() {
   const [plantFile, setPlantFile] = useState<File | null>(null)
   const [plantFileUrl, setPlantFileUrl] = useState('')
   const [isDragOverPlant, setIsDragOverPlant] = useState(false)
-  const [treesPlantedInput, setTreesPlantedInput] = useState('')
+  const [treesPlantedInput, setTreesPlantedInput] = useState('1')
   const [treeType, setTreeType] = useState('')
   const [mangroveAnswer, setMangroveAnswer] = useState<'yes' | 'no' | null>(
     null,
@@ -78,6 +80,15 @@ export default function CompleteSubmissionPage() {
   const [celebrationOfflineMangrove, setCelebrationOfflineMangrove] =
     useState(false)
   const postCelebrateHrefRef = useRef<string | null>(null)
+  const [showResumeBanner, setShowResumeBanner] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (sessionStorage.getItem('tg_resume_step2') === '1') {
+      setShowResumeBanner(true)
+      sessionStorage.removeItem('tg_resume_step2')
+    }
+  }, [])
 
   const resolvedTreeType = useMemo(() => {
     if (mangroveAnswer === 'yes') return 'mangrove'
@@ -300,13 +311,25 @@ export default function CompleteSubmissionPage() {
       clearPlantVideo()
 
       if (isUserOnline && isMangrove) {
+        const counted = uploadedPlantAi?.countedMangroves
+        if (
+          uploadedPlantAi?.status === 'completed' &&
+          typeof counted === 'number' &&
+          Number.isFinite(counted)
+        ) {
+          setMangroveUploadAwaitingContinue(true)
+          setUploadSuccess(true)
+          toast.success(
+            `AI counted ${counted} mangrove seedling${counted === 1 ? '' : 's'} in your video`,
+          )
+          return
+        }
         setMangroveUploadAwaitingContinue(false)
         setShowUploadModal(false)
         setCelebrationVariant('submitted')
         setCelebrationOfflineMangrove(false)
         postCelebrateHrefRef.current = submissionDetailHref
         setShowSubmissionCelebrate(true)
-        const counted = uploadedPlantAi?.countedMangroves
         if (
           uploadedPlantAi?.status === 'completed' &&
           typeof counted === 'number'
@@ -408,7 +431,7 @@ export default function CompleteSubmissionPage() {
           <HiArrowLeft className="h-6 w-6" />
         </button>
         <h1 className="text-[18px] font-bold text-[#111]">
-          Complete Submission
+          Step 2 of 2 — After video
         </h1>
         <span className="w-8" aria-hidden />
       </header>
@@ -425,9 +448,35 @@ export default function CompleteSubmissionPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
+            {showResumeBanner ? (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+                <p className="text-sm font-semibold text-sky-950">
+                  Unfinished submission — continuing at step 2 (after video)
+                </p>
+                <p className="mt-1 text-sm text-sky-900/90">
+                  Your before video is already saved. Plant in the field, then
+                  upload the after clip below.
+                </p>
+              </div>
+            ) : null}
+
+            <div>
+              <p className="text-sm font-medium text-gray-500">Step 2 of 2</p>
+              <div className="mt-1 flex flex-row items-center gap-2">
+                <div className="h-1 flex-1 rounded-full bg-tree-green-2" />
+                <div className="h-1 flex-1 rounded-full bg-tree-green-2" />
+              </div>
+              <p className="mt-2 text-sm text-gray-600">
+                Your before video is saved. Plant in the field, then record the
+                after clip.
+              </p>
+            </div>
+
+            <TwoVideoProofSteps activeStep={3} />
+
             <section>
               <h2 className="mb-2 text-base font-semibold text-gray-800">
-                Land video
+                Before video (saved)
               </h2>
               {landVideoUrl ? (
                 <div className="w-full overflow-hidden rounded-xl bg-black shadow-md">
@@ -451,10 +500,11 @@ export default function CompleteSubmissionPage() {
 
             <section>
               <h2 className="mb-2 text-base font-semibold text-gray-800">
-                Plant video
+                After video (planted area)
               </h2>
               <p className="mb-3 text-sm text-gray-500">
-                Record the area after planting and upload it here.
+                Film the same area after planting. Clips up to{' '}
+                {VIDEO_CONFIG.MAX_DURATION_SECONDS} seconds are accepted.
               </p>
               {plantFile ? (
                 <div className="relative aspect-[2/1] w-full overflow-hidden rounded-xl bg-black shadow-md">

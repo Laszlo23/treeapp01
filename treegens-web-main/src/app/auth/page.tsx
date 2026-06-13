@@ -63,6 +63,8 @@ export default function AuthPage() {
   const [pendingSignIn, setPendingSignIn] = useState(false)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const authAttemptRef = useRef(false)
+  /** Survives brief gaps between wallet modal close and `account.address` hydration. */
+  const signInIntentRef = useRef(false)
   const [serviceWorkerVersion, setServiceWorkerVersion] = useState<
     string | null
   >(offlineVideoService.activeVersion)
@@ -88,8 +90,15 @@ export default function AuthPage() {
   }, [])
 
   useEffect(() => {
+    if (authContextLoading) return
+    if (isAuthenticated && token) {
+      router.replace(routes.Home)
+    }
+  }, [authContextLoading, isAuthenticated, token, router])
+
+  useEffect(() => {
     if (
-      !pendingSignIn ||
+      !signInIntentRef.current ||
       !account?.address ||
       isAuthenticated ||
       isAuthenticating ||
@@ -108,13 +117,13 @@ export default function AuthPage() {
           toast.error('Sign in failed. Please try again.')
         }
       } finally {
+        signInIntentRef.current = false
         setPendingSignIn(false)
         setIsAuthenticating(false)
         authAttemptRef.current = false
       }
     })()
   }, [
-    pendingSignIn,
     account?.address,
     isAuthenticated,
     isAuthenticating,
@@ -124,11 +133,18 @@ export default function AuthPage() {
 
   // If the user closes/cancels the wallet modal without connecting, re-enable sign-in.
   useEffect(() => {
-    if (!pendingSignIn) return
+    if (!pendingSignIn && !signInIntentRef.current) return
     if (isAuthenticating) return
     if (account?.address) return
     if (isWalletConnecting) return
-    setPendingSignIn(false)
+
+    const timer = window.setTimeout(() => {
+      if (isAuthenticating || account?.address || isWalletConnecting) return
+      signInIntentRef.current = false
+      setPendingSignIn(false)
+    }, 2000)
+
+    return () => window.clearTimeout(timer)
   }, [
     pendingSignIn,
     isAuthenticating,
@@ -138,8 +154,10 @@ export default function AuthPage() {
 
   const handleSignInPress = () => {
     if (pendingSignIn || isAuthenticating || isWalletConnecting) return
+    signInIntentRef.current = true
     setPendingSignIn(true)
     openConnectModal(getTreegensConnectModalProps()).catch(() => {
+      signInIntentRef.current = false
       setPendingSignIn(false)
     })
   }
@@ -154,8 +172,12 @@ export default function AuthPage() {
 
   if (isAuthenticated && token) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-lime-green-2" />
+      <div className="relative min-h-screen w-full">
+        <AuthBackdrop />
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-lime-green-2" />
+          <p className="text-center text-white">Taking you home…</p>
+        </div>
       </div>
     )
   }

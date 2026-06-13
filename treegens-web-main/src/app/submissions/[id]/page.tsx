@@ -6,6 +6,7 @@ import { PlantVideoSection } from '@/components/submission-detail/PlantVideoSect
 import { SubmissionDmThread } from '@/components/submission-detail/SubmissionDmThread'
 import { RejectionFeedbackFooter } from '@/components/submission-detail/RejectionFeedbackFooter'
 import { SubmissionStatusBadges } from '@/components/submission-detail/SubmissionStatusBadges'
+import { TwoVideoProofSteps } from '@/components/submission/TwoVideoProofSteps'
 import { Spinner } from '@/components/ui/Spinner'
 import { getSubmissionById } from '@/services/app'
 import { claimReward, getRewardStatus } from '@/services/rewardService'
@@ -302,6 +303,27 @@ export default function SubmissionDetailPage() {
               rewardClaimDisplay={rewardClaimDisplay}
               statusMeta={statusMeta}
             />
+
+            {!plantVideo && group.submissionStatus === 'awaiting_plant' ? (
+              <Link
+                href={`/submissions/create/${encodeURIComponent(id)}`}
+                className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-4 text-center shadow-sm"
+              >
+                <p className="text-sm font-bold text-amber-950">
+                  Step 2 of 2 — after video required
+                </p>
+                <p className="mt-1 text-sm text-amber-900/90">
+                  Tap here to upload your after video
+                  {group.submissionTreeSpecies?.toLowerCase() === 'mangrove' ||
+                  group.submissionTreesPlanted != null
+                    ? ' and get your AI mangrove count'
+                    : ''}
+                  .
+                </p>
+              </Link>
+            ) : null}
+
+            <TwoVideoProofSteps activeStep={3} className="mb-1" />
 
             <LandVideoSection
               videoUrl={landVideoUrl}

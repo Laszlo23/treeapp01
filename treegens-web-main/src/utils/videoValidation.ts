@@ -77,10 +77,12 @@ export const validateVideoFile = async (
 
     // Check duration
     const duration = await getVideoDuration(file)
-    if (duration > VIDEO_CONFIG.MAX_DURATION_SECONDS) {
+    const maxDurationSeconds = VIDEO_CONFIG.MAX_DURATION_SECONDS
+    // Small grace for browser metadata rounding on clips recorded at the max length.
+    if (duration > maxDurationSeconds + 0.5) {
       return {
         isValid: false,
-        error: `Video too long. Maximum duration: ${VIDEO_CONFIG.MAX_DURATION_SECONDS} seconds`,
+        error: `Video too long. Maximum duration: ${maxDurationSeconds} seconds`,
         duration,
         fileSize: fileSizeMB,
       }
@@ -121,10 +123,11 @@ export const validateCompressedVideo = async (
   // Duration check (should not change after compression)
   try {
     const duration = await getVideoDuration(file)
-    if (duration > VIDEO_CONFIG.MAX_DURATION_SECONDS) {
+    const maxDurationSeconds = VIDEO_CONFIG.MAX_DURATION_SECONDS
+    if (duration > maxDurationSeconds + 0.5) {
       return {
         isValid: false,
-        error: `Video duration invalid after compression: ${duration.toFixed(1)}s. Maximum: ${VIDEO_CONFIG.MAX_DURATION_SECONDS}s`,
+        error: `Video duration invalid after compression: ${duration.toFixed(1)}s. Maximum: ${maxDurationSeconds}s`,
         duration,
         fileSize: fileSizeMB,
       }

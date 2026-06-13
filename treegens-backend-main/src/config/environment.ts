@@ -349,8 +349,8 @@ class EnvironmentConfig {
 
   get AI_MAX_COUNT_DELTA() {
     const raw = process.env.AI_MAX_COUNT_DELTA
-    const n = raw !== undefined && raw !== '' ? parseInt(String(raw), 10) : 1
-    return Number.isNaN(n) || n < 0 ? 1 : n
+    const n = raw !== undefined && raw !== '' ? parseInt(String(raw), 10) : 2
+    return Number.isNaN(n) || n < 0 ? 2 : n
   }
 
   /** Comma-separated paths to try for integer count (e.g. `count,data.count`). */

@@ -473,11 +473,21 @@ export default class UserService {
     return d.toISOString().slice(0, 10)
   }
 
-  async getSocialRewardsSummary(walletAddress: string) {
+  async getSocialRewardsSummary(
+    walletAddress: string,
+    opts?: { userId?: string },
+  ) {
     const normalizedWalletAddress = walletAddress.toLowerCase()
-    const user: any = await User.findOne({
+    let user: any = await User.findOne({
       walletAddress: normalizedWalletAddress,
     }).lean()
+    if (
+      !user &&
+      typeof opts?.userId === 'string' &&
+      /^[a-fA-F0-9]{24}$/.test(opts.userId.trim())
+    ) {
+      user = await User.findById(opts.userId.trim()).lean()
+    }
     if (!user) return null
 
     const done = new Map<string, Date>(

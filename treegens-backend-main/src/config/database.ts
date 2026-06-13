@@ -8,11 +8,10 @@ const connectDB = async () => {
 
     console.log(`MongoDB Connected: ${conn.connection.host}`)
 
-    // Run migrations after connection
     await runMigrations()
   } catch (error) {
     console.error('Database connection error:', error)
-    process.exit(1)
+    throw error
   }
 }
 

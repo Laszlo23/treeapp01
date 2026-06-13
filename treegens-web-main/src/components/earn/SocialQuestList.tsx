@@ -14,7 +14,7 @@ import cn from 'classnames'
 import { useActiveAccount } from 'thirdweb/react'
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { notifyError } from '@/utils/apiErrorMessage'
+import { apiErrorMessage, notifyError } from '@/utils/apiErrorMessage'
 import {
   HiArrowTopRightOnSquare,
   HiBolt,
@@ -416,16 +416,26 @@ export function SocialQuestList({ onUpdated }: Props) {
 
   const [data, setData] = useState<ISocialRewardsSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [busyTask, setBusyTask] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
       setLoading(true)
-      const { data: envelope } = await getSocialRewardsSummary()
-      setData(envelope.data)
+      setLoadError(null)
+      const res = await getSocialRewardsSummary()
+      const envelope = res.data
+      const summary = envelope?.data
+      setData(
+        summary != null
+          ? summary
+          : { pointsTotal: 0, tasks: [] },
+      )
     } catch (e) {
       console.error(e)
-      notifyError('Could not load rewards')
+      const msg = apiErrorMessage(e, 'Could not load rewards')
+      setLoadError(msg)
+      setData(null)
     } finally {
       setLoading(false)
     }
@@ -489,6 +499,23 @@ export function SocialQuestList({ onUpdated }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      {loadError && !loading ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200/90 bg-red-50/95 px-4 py-3 text-sm text-red-950 shadow-sm"
+        >
+          <p className="font-semibold">Rewards unavailable</p>
+          <p className="mt-1 leading-relaxed opacity-95">{loadError}</p>
+          <button
+            type="button"
+            className="tg-cta mt-3 inline-flex rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wide"
+            onClick={() => void load()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
       <div className="tg-pill-card relative overflow-hidden px-5 py-6">
           <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#DFEA8A]/35 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-16 -left-10 h-48 w-48 rounded-full bg-[#6B8C3B]/20 blur-3xl" />
@@ -559,6 +586,11 @@ export function SocialQuestList({ onUpdated }: Props) {
                 <QuestSkeleton />
                 <QuestSkeleton />
               </>
+            ) : loadError ? (
+              <p className="py-6 text-center text-sm text-[#6b6560]">
+                Use <span className="font-semibold text-[#435F24]">Retry</span>{' '}
+                above to reload quests.
+              </p>
             ) : (data?.tasks ?? []).length === 0 ? (
               <div className="tg-pill-card rounded-2xl border-dashed border-[#435F24]/28 px-5 py-10 text-center">
                 <p className="text-sm font-bold text-[#374151]">

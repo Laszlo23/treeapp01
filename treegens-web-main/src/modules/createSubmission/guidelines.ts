@@ -1,8 +1,16 @@
+import { VIDEO_CONFIG } from '@/utils/constants'
+
 /** Mirrors `mobile/modules/createSubmission/guidelines.ts` */
 export const guidelines = [
   {
-    title: 'Keep it short',
-    description: 'Focus on the essential area only',
+    title: 'Two videos required',
+    description:
+      'Film the land before planting, plant your trees in the field, then film the same area after planting.',
+  },
+  {
+    title: `Up to ${VIDEO_CONFIG.MAX_DURATION_SECONDS} seconds`,
+    description:
+      `You can record up to ${VIDEO_CONFIG.MAX_DURATION_SECONDS} seconds—enough to pan across the planting area in one smooth clip`,
   },
   {
     title: 'Be ready',

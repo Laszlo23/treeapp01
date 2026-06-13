@@ -90,7 +90,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     try {
       const response = await getCurrentUser()
-      setUser(response.data.data)
+      const profile = response.data?.data
+      if (profile) setUser(profile)
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 404) {
         toast.error(
@@ -112,7 +113,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       if (isUserOnline) {
         const response = await getUserVideos()
-        const fetchedVideos = response.data.data.videos.sort((a, b) => {
+        const rawVideos = response.data?.data?.videos
+        if (!Array.isArray(rawVideos)) {
+          setVideos(readCachedVideos() || [])
+          return
+        }
+        const fetchedVideos = [...rawVideos].sort((a, b) => {
           return (
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )

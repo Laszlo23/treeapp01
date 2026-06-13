@@ -50,6 +50,10 @@ export function PlantAiResultSummary({
         {ai.skipReason ? (
           <p className="mt-1 text-sm text-amber-950/90">{ai.skipReason}</p>
         ) : null}
+        <p className="mt-2 text-sm text-amber-900/80">
+          Film one smooth pan on your before and after videos for best AI
+          results.
+        </p>
       </div>
     )
   }
@@ -66,12 +70,41 @@ export function PlantAiResultSummary({
           A reviewer will check your video.{' '}
           {ai.error ? `(${ai.error})` : null}
         </p>
+        <p className="mt-2 text-sm text-red-800/80">
+          Film one smooth pan on your before and after videos for best AI
+          results.
+        </p>
       </div>
     )
   }
 
   const n = ai.countedMangroves
   const confLabel = formatConfidence(ai.confidence)
+  const lowConfidence =
+    typeof ai.confidence === 'number' &&
+    Number.isFinite(ai.confidence) &&
+    ai.confidence < 0.5
+
+  if (
+    typeof n === 'number' &&
+    Number.isFinite(n) &&
+    n === 0 &&
+    (lowConfidence || ai.confidence == null)
+  ) {
+    return (
+      <div
+        className={`rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-left ${className}`}
+      >
+        <p className="text-sm font-semibold text-amber-950">
+          Uncertain count — verifier will review
+        </p>
+        <p className="mt-1 text-sm text-amber-900/90">
+          We could not confidently count seedlings in this clip. A human
+          reviewer will check your before and after videos.
+        </p>
+      </div>
+    )
+  }
 
   if (typeof n === 'number' && Number.isFinite(n) && n >= 0) {
     if (variant === 'hero') {

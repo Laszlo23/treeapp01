@@ -10,8 +10,8 @@ export const VIDEO_CONFIG = {
   // Maximum video size that can be uploaded without compression
   MAX_ALLOWED_SIZE_WITHOUT_COMPRESSION_MB: 1,
 
-  // Maximum original video size before compression
-  MAX_ORIGINAL_SIZE_MB: 20,
+  // Maximum original video size before compression (20s phone clips can be large)
+  MAX_ORIGINAL_SIZE_MB: 50,
 
   // Video duration limits
   MAX_DURATION_SECONDS: 20,

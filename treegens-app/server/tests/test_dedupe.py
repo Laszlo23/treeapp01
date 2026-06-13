@@ -8,8 +8,8 @@ from app.services.detection_dedupe import (
 
 
 class _FakeSettings:
-    dedupe_center_distance = 0.079
-    short_clip_max_duration_seconds = 10.0
+    dedupe_center_distance = 0.085
+    short_clip_max_duration_seconds = 20.0
     short_clip_dedupe_center_distance = 0.11
 
 
@@ -35,9 +35,14 @@ def test_effective_dedupe_short_clip():
     assert effective_dedupe_center_distance(s, 5.0) == 0.11
 
 
+def test_effective_dedupe_at_twenty_seconds_uses_short_clip_threshold():
+    s = _FakeSettings()
+    assert effective_dedupe_center_distance(s, 20.0) == 0.11
+
+
 def test_effective_dedupe_long_clip():
     s = _FakeSettings()
-    assert effective_dedupe_center_distance(s, 30.0) == 0.079
+    assert effective_dedupe_center_distance(s, 30.0) == 0.085
 
 
 def test_unique_estimate_merges_nearby():

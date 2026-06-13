@@ -171,7 +171,9 @@ router.get(
 router.get('/me/social-rewards', authenticate, async (req: Request, res: Response) => {
   try {
     const walletAddress = req.user.walletAddress
-    const summary = await userService.getSocialRewardsSummary(walletAddress)
+    const summary = await userService.getSocialRewardsSummary(walletAddress, {
+      userId: req.user.userId?.toString?.() ?? String(req.user.userId ?? ''),
+    })
     if (!summary) return sendNotFound(res, 'User')
     return sendSuccess(res, 'Social rewards retrieved', summary)
   } catch (error: unknown) {

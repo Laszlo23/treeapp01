@@ -106,6 +106,8 @@ export const videoService = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        // Plant upload includes server-side AI counting (can take 1–2 min).
+        timeout: 180_000,
         onUploadProgress: evt => {
           if (options?.onUploadProgress) {
             const total = evt.total ?? evt.loaded

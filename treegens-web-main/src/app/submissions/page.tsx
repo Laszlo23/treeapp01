@@ -275,6 +275,8 @@ export default function MySubmissionsPage() {
               const clip = sourceDoc
                 ? primaryClipForSubmission(sourceDoc)
                 : null
+              const awaitingPlant =
+                g.submissionStatus === 'awaiting_plant' || !g.plantVideo
               return (
                 <li key={g.submissionId}>
                   {clip ? (
@@ -282,6 +284,14 @@ export default function MySubmissionsPage() {
                       video={clip}
                       detailHref={href}
                       statusMeta={getPlanterSubmissionBadge(g)}
+                      aiVerification={g.aiVerification}
+                      treeSpecies={g.submissionTreeSpecies}
+                      awaitingPlantClip={awaitingPlant && !!g.landVideo}
+                      completePlantHref={
+                        awaitingPlant
+                          ? `/submissions/create/${encodeURIComponent(g.submissionId)}`
+                          : undefined
+                      }
                       rewardClaimDisplay={
                         typeof rewardClaimedById[g.submissionId] === 'boolean'
                           ? rewardClaimedById[g.submissionId]

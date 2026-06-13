@@ -24,8 +24,6 @@ const app = express()
 
 app.set('trust proxy', 1)
 
-connectDB()
-
 app.use(helmet())
 app.use(cors())
 app.use(express.json({ limit: '50mb' }))
@@ -92,9 +90,21 @@ app.get('/', (req, res) => {
 
 app.use(errorHandler)
 
-app.listen(env.PORT, () => {
-  console.log(`Server running on port ${env.PORT}`)
-})
+async function start() {
+  try {
+    await connectDB()
+  } catch {
+    console.error('Refusing to start API without MongoDB. Fix MONGODB_URI and retry.')
+    process.exit(1)
+    return
+  }
+
+  app.listen(env.PORT, () => {
+    console.log(`Server running on port ${env.PORT}`)
+  })
+}
+
+void start()
 
 if (env.ENABLE_REWARD_CLAIM_WORKER === 'true') {
   startRewardClaimWorker()

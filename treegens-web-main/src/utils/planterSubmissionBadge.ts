@@ -32,6 +32,13 @@ export function getPlanterSubmissionBadge(
   if (s === 'approved') {
     return { label: 'Approved', Icon: IoCheckmarkCircle, color: '#1d4ed8' }
   }
+  if (s === 'awaiting_plant' && hasLand && !hasPlant) {
+    return {
+      label: 'Needs after video',
+      Icon: IoDocumentTextOutline,
+      color: '#d97706',
+    }
+  }
   if (s === 'draft' || s === 'awaiting_plant' || !hasLand || !hasPlant) {
     return { label: 'Draft', Icon: IoDocumentTextOutline, color: '#64748b' }
   }

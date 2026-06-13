@@ -13,6 +13,7 @@ import {
 import { enqueueNotification } from './notificationService'
 import RewardService from './rewardService'
 import { applyMinorityPenaltiesForVotes } from './verifierPenaltyService'
+import { evaluateMangroveAiRouting } from './submissionAiRouting'
 
 const rewardService = new RewardService()
 
@@ -315,12 +316,14 @@ class SubmissionService {
       } else if (aiResult.ok) {
         const counted = aiResult.countedMangroves
         const conf = aiResult.confidence
-        const maxDelta = env.AI_MAX_COUNT_DELTA
-        const minConf = env.AI_AUTO_APPROVE_MIN_CONFIDENCE
-        const countOk = Math.abs(counted - trees) <= maxDelta
-        const confOk =
-          typeof conf === 'number' && Number.isFinite(conf) && conf >= minConf
-        const shouldAutoApprove = confOk && countOk
+        const routing = evaluateMangroveAiRouting({
+          countedMangroves: counted,
+          declaredTreesPlanted: trees,
+          confidence: conf,
+          maxCountDelta: env.AI_MAX_COUNT_DELTA,
+          minConfidence: env.AI_AUTO_APPROVE_MIN_CONFIDENCE,
+        })
+        const shouldAutoApprove = routing.shouldAutoApprove
 
         submission.aiVerification = {
           status: 'completed',
@@ -328,14 +331,14 @@ class SubmissionService {
           countedMangroves: counted,
           ...(typeof conf === 'number' ? { confidence: conf } : {}),
           rawResponse: stringifyAiRawForStorage(aiResult.raw),
-          decision: shouldAutoApprove ? 'auto_approved' : 'pending_verifier',
+          decision: routing.decision,
         } as any
 
         if (shouldAutoApprove) {
-          submission.status = 'approved'
+          submission.status = routing.submissionStatus
           submission.reviewedAt = new Date()
         } else {
-          submission.status = 'pending_review'
+          submission.status = routing.submissionStatus
         }
       } else {
         const failure = aiResult as AiMangroveVerifyFailure

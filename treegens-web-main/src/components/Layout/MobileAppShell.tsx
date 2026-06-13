@@ -3,6 +3,7 @@
 import { AppFooter } from '@/components/Layout/AppFooter'
 import { AppBottomNav } from '@/components/Layout/AppBottomNav'
 import { shouldShowBottomNav } from '@/config/appConfig'
+import { isDesktopVisiblePath } from '@/utils/desktopVisiblePaths'
 import cn from 'classnames'
 import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
@@ -11,11 +12,13 @@ import { usePathname } from 'next/navigation'
 export function MobileAppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const navVisible = shouldShowBottomNav(pathname)
+  const showOnDesktop = isDesktopVisiblePath(pathname)
 
   return (
     <div
       className={cn(
-        'fixed inset-0 w-full overflow-y-auto overflow-x-hidden md:hidden',
+        'fixed inset-0 w-full overflow-y-auto overflow-x-hidden',
+        showOnDesktop ? '' : 'md:hidden',
         navVisible
           ? 'pb-[calc(9rem+env(safe-area-inset-bottom,0px))]'
           : 'pb-4',

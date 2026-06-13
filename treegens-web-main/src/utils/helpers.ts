@@ -1,7 +1,7 @@
 import { VideoType } from '@/services/videoService'
 import { ISubmissionGroup, IUserProfile, IVideo, VideoStatus } from '@/types'
 
-import { apiBaseUrl as baseURL } from '@/config/apiBaseUrl'
+import { getApiBaseUrl } from '@/config/apiBaseUrl'
 const VIDEOS_CACHE_KEY = 'treegens_videos'
 const USER_CACHE_KEY = 'treegens_cached_user'
 
@@ -64,7 +64,7 @@ export const getVideoStatusText = (status: VideoStatus) => {
 
 export const isBackendHealthy = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${baseURL}/health`, {
+    const response = await fetch(`${getApiBaseUrl()}/health`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
