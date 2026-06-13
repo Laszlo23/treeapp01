@@ -37,9 +37,9 @@ import {
   useDisconnect,
   useWalletDetailsModal,
 } from 'thirdweb/react'
+import { getTreegensInAppWallet } from '@/config/treegensInAppWallet'
 import {
   createWallet,
-  inAppWallet,
   type InAppWalletAuth,
   type WalletId,
 } from 'thirdweb/wallets'
@@ -142,11 +142,7 @@ export default function Profile() {
           return
         }
         wallets = [
-          inAppWallet({
-            auth: {
-              options: [lastAuthProvider as InAppWalletAuth],
-            },
-          }),
+          getTreegensInAppWallet([lastAuthProvider as InAppWalletAuth]),
         ]
       } else {
         wallets = [createWallet(lastWalletId as WalletId)]

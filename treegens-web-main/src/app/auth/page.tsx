@@ -2,6 +2,7 @@
 
 import { routes } from '@/config/appConfig'
 import { getTreegensConnectModalProps } from '@/config/thirdwebConnect'
+import { EmailSignInForm } from '@/components/auth/EmailSignInForm'
 import { useAuth } from '@/contexts/AuthProvider'
 import { offlineVideoService } from '@/services/offlineVideoService'
 import Image from 'next/image'
@@ -96,6 +97,38 @@ export default function AuthPage() {
     }
   }, [authContextLoading, isAuthenticated, token, router])
 
+  /** After OAuth / magic-link redirect, wallet may reconnect before JWT exists. */
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const pending =
+      sessionStorage.getItem('tg_oauth_pending') === '1' ||
+      new URLSearchParams(window.location.search).has('walletId')
+    if (!pending) return
+    if (!account?.address || isAuthenticated || isAuthenticating) return
+    if (authAttemptRef.current) return
+
+    authAttemptRef.current = true
+    sessionStorage.removeItem('tg_oauth_pending')
+    ;(async () => {
+      setIsAuthenticating(true)
+      try {
+        const ok = await authenticate(true)
+        if (ok) {
+          router.replace(routes.Home)
+        }
+      } finally {
+        setIsAuthenticating(false)
+        authAttemptRef.current = false
+      }
+    })()
+  }, [
+    account?.address,
+    isAuthenticated,
+    isAuthenticating,
+    authenticate,
+    router,
+  ])
+
   useEffect(() => {
     if (
       !signInIntentRef.current ||
@@ -154,11 +187,17 @@ export default function AuthPage() {
 
   const handleSignInPress = () => {
     if (pendingSignIn || isAuthenticating || isWalletConnecting) return
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tg_oauth_pending', '1')
+    }
     signInIntentRef.current = true
     setPendingSignIn(true)
     openConnectModal(getTreegensConnectModalProps()).catch(() => {
       signInIntentRef.current = false
       setPendingSignIn(false)
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('tg_oauth_pending')
+      }
     })
   }
 
@@ -224,6 +263,12 @@ export default function AuthPage() {
         </div>
 
         <div className="mx-auto flex w-4/5 max-w-md flex-col items-center gap-3">
+          <EmailSignInForm />
+
+          <p className="w-full text-center text-xs font-medium uppercase tracking-wide text-white/70">
+            or connect a wallet
+          </p>
+
           <div className="w-[60%] max-w-xs">
             <button
               type="button"
@@ -231,7 +276,7 @@ export default function AuthPage() {
               className="flex w-full items-center justify-center rounded-[25px] bg-black px-6 py-3.5 font-semibold text-white disabled:opacity-60"
               disabled={pendingSignIn || isWalletConnecting}
             >
-              Sign in
+              Sign in with wallet
             </button>
           </div>
           <p className="w-full px-1 text-center text-xs leading-5 text-white/85">

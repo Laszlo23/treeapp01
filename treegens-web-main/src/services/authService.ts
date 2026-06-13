@@ -104,11 +104,22 @@ export class AuthService {
     chainId?: number,
   ): Promise<string> {
     try {
-      const signature = chainId
-        ? await account.signMessage({ message, chainId })
-        : await account.signMessage({ message })
-      return signature
+      if (chainId) {
+        return await account.signMessage({ message, chainId })
+      }
+      return await account.signMessage({ message })
     } catch (error) {
+      if (chainId) {
+        try {
+          return await account.signMessage({ message })
+        } catch (fallbackError) {
+          console.error('Error signing message (with/without chainId):', {
+            error,
+            fallbackError,
+          })
+          throw new Error('Failed to sign challenge message')
+        }
+      }
       console.error('Error signing message:', error)
       throw new Error('Failed to sign challenge message')
     }

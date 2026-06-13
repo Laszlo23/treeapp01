@@ -1,6 +1,7 @@
 import type { Wallet } from 'thirdweb/wallets'
-import { createWallet, inAppWallet } from 'thirdweb/wallets'
+import { createWallet } from 'thirdweb/wallets'
 import { getTreegensAppMetadata } from '@/config/thirdwebConfig'
+import { getTreegensInAppWallet } from '@/config/treegensInAppWallet'
 
 /**
  * Wallets used across connect flows — must match `AutoConnect` and connect modals
@@ -11,7 +12,7 @@ import { getTreegensAppMetadata } from '@/config/thirdwebConfig'
  * @see https://portal.thirdweb.com/typescript/v5/createWallet
  */
 export const treegensWallets: Wallet[] = [
-  inAppWallet(),
+  getTreegensInAppWallet(),
   createWallet('io.metamask'),
   createWallet('com.coinbase.wallet', {
     appMetadata: getTreegensAppMetadata(),

@@ -27,13 +27,21 @@ import { defaultChain } from '@/config/thirdwebChain'
 import { AuthService } from '../services/authService'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
 import { useConnectivity } from './ConnectivityProvider'
+import type { Account } from 'thirdweb/wallets'
+import type { Wallet } from 'thirdweb/wallets'
+
+export type AuthenticateOptions = {
+  /** Use when wallet just connected and React hooks have not caught up yet. */
+  account?: Account
+  wallet?: Wallet | null
+}
 
 // Authentication context types
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   token: string | null
-  authenticate: (force?: boolean) => Promise<boolean>
+  authenticate: (force?: boolean, options?: AuthenticateOptions) => Promise<boolean>
   signOut: () => Promise<void>
 }
 
@@ -79,8 +87,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   /**
    * Authenticate user with current wallet account
    */
-  const authenticate = async (force = false): Promise<boolean> => {
-    if (!account?.address) {
+  const authenticate = async (
+    force = false,
+    options?: AuthenticateOptions,
+  ): Promise<boolean> => {
+    const resolvedAccount = options?.account ?? account
+    const resolvedWallet = options?.wallet ?? activeWallet
+
+    if (!resolvedAccount?.address) {
       toast.error('Please connect your wallet first')
       return false
     }
@@ -95,8 +109,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     lastAuthAttemptAtRef.current = Date.now()
     setIsLoading(true)
     try {
-      const onChain = activeWallet?.getChain()?.id
-      if (onChain !== defaultChain.id) {
+      const isInAppWallet =
+        resolvedWallet?.id === 'inApp' ||
+        resolvedWallet?.id?.startsWith('ecosystem.')
+
+      const onChain = resolvedWallet?.getChain?.()?.id
+      if (!isInAppWallet && onChain !== defaultChain.id) {
         try {
           await switchChain(defaultChain)
         } catch (switchErr) {
@@ -109,18 +127,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       const jwtToken = await AuthService.authenticateWithWallet(
-        account,
-        defaultChain.id,
+        resolvedAccount,
+        isInAppWallet ? undefined : defaultChain.id,
       )
-      if (typeof window !== 'undefined' && activeWallet?.id) {
-        localStorage.setItem(LAST_WALLET_ID_KEY, activeWallet.id)
+      if (typeof window !== 'undefined' && resolvedWallet?.id) {
+        localStorage.setItem(LAST_WALLET_ID_KEY, resolvedWallet.id)
         localStorage.setItem(
           LAST_WALLET_ADDRESS_KEY,
-          account.address.toLowerCase(),
+          resolvedAccount.address.toLowerCase(),
         )
-        const isInAppWallet =
-          activeWallet.id === 'inApp' ||
-          activeWallet.id.startsWith('ecosystem.')
         if (isInAppWallet) {
           const lastAuthProvider = await getLastAuthProvider()
           if (lastAuthProvider) {
